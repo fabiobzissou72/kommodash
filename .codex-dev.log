@@ -1,0 +1,32 @@
+
+> kommo-dashboard@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.0 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.15.3:3000
+- Environments: .env.local
+✓ Ready in 680ms
+
+ GET / 200 in 557ms (next.js: 313ms, application-code: 244ms)
+ POST /api/auth 200 in 1520ms (next.js: 184ms, application-code: 1336ms)
+ GET /dashboard 200 in 79ms (next.js: 39ms, application-code: 40ms)
+ GET /api/accounts 200 in 247ms (next.js: 76ms, application-code: 171ms)
+ GET /api/accounts 200 in 159ms (next.js: 4ms, application-code: 155ms)
+ POST /api/kommo 200 in 37.1s (next.js: 108ms, application-code: 37.0s)
+ POST /api/kommo 200 in 37.3s (next.js: 4ms, application-code: 37.3s)
+ POST /api/leads 200 in 907ms (next.js: 53ms, application-code: 855ms)
+ POST /api/analyze 404 in 701ms (next.js: 47ms, application-code: 654ms)
+ POST /api/analyze 404 in 240ms (next.js: 5ms, application-code: 235ms)
+ POST /api/analyze 404 in 261ms (next.js: 5ms, application-code: 256ms)
+ POST /api/leads 200 in 1146ms (next.js: 5ms, application-code: 1140ms)
+ POST /api/analyze 404 in 564ms (next.js: 3ms, application-code: 561ms)
+ POST /api/leads 200 in 701ms (next.js: 4ms, application-code: 698ms)
+ POST /api/history 200 in 569ms (next.js: 53ms, application-code: 516ms)
+ POST /api/analyze 404 in 529ms (next.js: 3ms, application-code: 526ms)
+ POST /api/leads 200 in 859ms (next.js: 5ms, application-code: 855ms)
+ POST /api/analyze 200 in 3.9s (next.js: 3ms, application-code: 3.9s)
+ POST /api/leads 200 in 1711ms (next.js: 3ms, application-code: 1708ms)
+ POST /api/analyze 404 in 529ms (next.js: 3ms, application-code: 526ms)
+ POST /api/leads 200 in 1655ms (next.js: 3ms, application-code: 1652ms)
+ POST /api/analyze 200 in 4.4s (next.js: 3ms, application-code: 4.4s)
