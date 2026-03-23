@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const { name, email, pass, invite_code } = body;
 
-  if (invite_code !== process.env.INVITE_CODE) {
+  if (String(invite_code).trim() !== (process.env.INVITE_CODE ?? "").trim()) {
     return NextResponse.json({ ok: false, error: "Código de convite inválido" }, { status: 403 });
   }
 
