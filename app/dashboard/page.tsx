@@ -39,6 +39,7 @@ type DashData = {
   recent_activity: ActivityItem[];
   tasks_list: TaskItem[];
   active_by_user: ActiveByUser[];
+  pacientes: { total: number; revenue: number; trimestral: number; semestral: number } | null;
 };
 type SnapshotRow = {
   snapshot_date: string;
@@ -531,6 +532,41 @@ export default function Dashboard() {
                   <StatCard label="Leads ativos" value={data.totals.active} accent="cyan" icon="🔥"
                     sub={BRL(data.totals.active_value)} />
                 </div>
+
+                {/* Row 3c — Pacientes Ativos */}
+                {data.pacientes && (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-emerald-400">
+                      <span>🏥</span> Pacientes Ativos
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <StatCard label="Faturamento total" value={BRL(data.pacientes.revenue)} accent="green" icon="💰"
+                        sub={`${data.pacientes.total} pacientes`} />
+                      <StatCard label="Plano Trimestral" value={data.pacientes.trimestral} accent="cyan" icon="📅"
+                        sub="pacientes ativos" />
+                      <StatCard label="Plano Semestral" value={data.pacientes.semestral} accent="purple" icon="📆"
+                        sub="pacientes ativos" />
+                      <div className="relative overflow-hidden rounded-xl border border-border bg-card/60 card-hover p-5">
+                        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-400 to-emerald-400 opacity-60" />
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Distribuição</p>
+                        {data.pacientes.trimestral + data.pacientes.semestral > 0 ? (
+                          <>
+                            <div className="flex gap-1 h-3 rounded-full overflow-hidden mt-3 mb-2">
+                              <div className="bg-cyan-400 rounded-l-full" style={{ width: `${Math.round(data.pacientes.trimestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}%` }} />
+                              <div className="bg-violet-400 rounded-r-full flex-1" />
+                            </div>
+                            <div className="flex justify-between text-xs mt-2">
+                              <span className="text-cyan-400">{Math.round(data.pacientes.trimestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}% trim</span>
+                              <span className="text-violet-400">{Math.round(data.pacientes.semestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}% sem</span>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground mt-3">Sem tags de plano</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Row 4 — Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

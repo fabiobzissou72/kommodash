@@ -20,6 +20,7 @@ type LeadRaw = {
   created_at: number;
   closed_at?: number;
   updated_at: number;
+  _embedded?: { tags?: { id: number; name: string }[] };
 };
 
 type TaskRaw = {
@@ -224,6 +225,24 @@ export async function POST(req: NextRequest) {
     });
     const hourly = Object.entries(hourlyMap).map(([hour, count]) => ({ hour, count }));
 
+    // === LOTE 2c: Pacientes Ativos ===
+    const pacientesPipeline = pipelines.find(p =>
+      p.name.toLowerCase().replace(/\s+/g, " ").trim() === "pacientes ativos"
+    );
+    let pacientes: { total: number; revenue: number; trimestral: number; semestral: number } | null = null;
+    if (pacientesPipeline) {
+      const pacData = await kommoFetchLeads(subdomain, safeToken,
+        `/leads?filter[pipeline_id]=${pacientesPipeline.id}&with=tags`, 20);
+      const trim = pacData.leads.filter(l =>
+        l._embedded?.tags?.some(t => t.name.toLowerCase() === "plano trimestral")
+      ).length;
+      const sem = pacData.leads.filter(l =>
+        l._embedded?.tags?.some(t => t.name.toLowerCase() === "plano semestral")
+      ).length;
+      pacientes = { total: pacData.count, revenue: pacData.value, trimestral: trim, semestral: sem };
+      await delay(200);
+    }
+
     // === LOTE 3: Funil por etapa ===
     const funnel: { name: string; count: number; value: number; rate: number }[] = [];
     const allFunnelLeads: LeadRaw[] = [];
@@ -403,6 +422,7 @@ export async function POST(req: NextRequest) {
       recent_activity: recentActivity,
       tasks_list: tasksList,
       active_by_user: activeByUser,
+      pacientes,
     };
 
     // Snapshot Supabase
