@@ -161,7 +161,7 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [newAcc, setNewAcc] = useState({ label: "", subdomain: "", token: "" });
-  const [tab, setTab] = useState<"dashboard" | "historico" | "ia">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "pacientes" | "historico" | "ia">("dashboard");
   const [history, setHistory] = useState<SnapshotRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [chartView, setChartView] = useState<"30dias" | "hoje">("30dias");
@@ -173,6 +173,9 @@ export default function Dashboard() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [analysisError, setAnalysisError] = useState("");
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL);
+  const [meta, setMeta] = useState(0);
+  const [metaInput, setMetaInput] = useState("");
+  const [metaSaved, setMetaSaved] = useState(false);
 
   async function loadLeads(q = "") {
     if (!accounts[activeAcc]) return;
@@ -201,6 +204,21 @@ export default function Dashboard() {
       if (json.error) setAnalysisError(json.error);
       else setAnalysisResult(json);
     } catch { setAnalysisError("Erro de conexão"); } finally { setAnalyzing(false); }
+  }
+
+  useEffect(() => {
+    const saved = localStorage.getItem("kommo_meta_mensal");
+    if (saved && Number(saved) > 0) { setMeta(Number(saved)); setMetaInput(saved); }
+  }, []);
+
+  function saveMeta() {
+    const v = Number(metaInput.replace(/\D/g, ""));
+    if (v > 0) {
+      setMeta(v);
+      localStorage.setItem("kommo_meta_mensal", String(v));
+      setMetaSaved(true);
+      setTimeout(() => setMetaSaved(false), 2000);
+    }
   }
 
   useEffect(() => {
@@ -359,7 +377,7 @@ export default function Dashboard() {
 
             {/* Tabs */}
             <div className="flex gap-0 border-b border-border">
-              {[{ key: "dashboard", label: "Dashboard" }, { key: "historico", label: "Histórico" }, { key: "ia", label: "IA Análise" }].map(t => (
+              {[{ key: "dashboard", label: "Dashboard" }, { key: "pacientes", label: "🏥 Pacientes" }, { key: "historico", label: "Histórico" }, { key: "ia", label: "IA Análise" }].map(t => (
                 <button key={t.key}
                   onClick={() => { setTab(t.key as any); if (t.key === "historico") fetchHistory(); }}
                   className={`px-5 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${tab === t.key ? "border-cyan-400 text-cyan-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -369,6 +387,200 @@ export default function Dashboard() {
             </div>
 
             {loading && !data && <LoadingGrid />}
+
+            {/* ════ PACIENTES ════ */}
+            {tab === "pacientes" && (
+              <div className="space-y-5">
+
+                {/* Header card com meta */}
+                <div className="rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 to-cyan-500/5 p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-bold flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-sm">🏥</span>
+                        Pacientes Ativos
+                      </h2>
+                      <p className="text-xs text-muted-foreground mt-1">Funil "Pacientes Ativos" · faturamento por plano fechado</p>
+                    </div>
+                    {/* Configurar Meta */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex rounded-lg overflow-hidden border border-border">
+                        <span className="px-3 flex items-center text-xs text-muted-foreground bg-secondary border-r border-border">R$</span>
+                        <input
+                          type="text"
+                          placeholder="Ex: 20000"
+                          value={metaInput}
+                          onChange={e => setMetaInput(e.target.value.replace(/\D/g, ""))}
+                          onKeyDown={e => e.key === "Enter" && saveMeta()}
+                          className="w-32 px-3 py-2 text-sm bg-background outline-none"
+                        />
+                      </div>
+                      <button onClick={saveMeta}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${metaSaved ? "bg-emerald-500 text-white" : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30"}`}>
+                        {metaSaved ? "✓ Salvo" : "Definir meta"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Barra de progresso vs meta */}
+                  {data?.pacientes && meta > 0 && (() => {
+                    const pct = Math.min(Math.round((data.pacientes.revenue / meta) * 100), 100);
+                    const over = data.pacientes.revenue > meta;
+                    return (
+                      <div>
+                        <div className="flex justify-between text-xs mb-2">
+                          <span className="text-muted-foreground">Progresso em relação à meta mensal</span>
+                          <span className={`font-bold text-sm ${over ? "text-emerald-400" : pct >= 70 ? "text-amber-400" : "text-rose-400"}`}>
+                            {pct}% {over && "🎉 Meta batida!"}
+                          </span>
+                        </div>
+                        <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${over ? "bg-gradient-to-r from-emerald-400 to-cyan-400" : pct >= 70 ? "bg-amber-400" : "bg-rose-400"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs mt-2 text-muted-foreground">
+                          <span>{BRL(data.pacientes.revenue)} faturado</span>
+                          <span>Meta: {BRL(meta)}</span>
+                        </div>
+                        {!over && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Faltam <span className="text-foreground font-semibold">{BRL(meta - data.pacientes.revenue)}</span> para bater a meta
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {meta === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      ↑ Configure uma meta mensal acima para ver o progresso
+                    </p>
+                  )}
+                  {!data?.pacientes && (
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-xs text-amber-400">
+                      ⚠ Pipeline "Pacientes Ativos" não encontrado nesta conta. Verifique se o nome está exato no Kommo.
+                    </div>
+                  )}
+                </div>
+
+                {/* Stats cards */}
+                {data?.pacientes && (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <StatCard
+                        label="Faturamento total"
+                        value={BRL(data.pacientes.revenue)}
+                        accent="green" icon="💰"
+                        sub={`${data.pacientes.total} pacientes no funil`}
+                      />
+                      <StatCard
+                        label="Plano Trimestral"
+                        value={data.pacientes.trimestral}
+                        accent="cyan" icon="📅"
+                        sub={data.pacientes.trimestral > 0 ? `${Math.round(data.pacientes.trimestral / data.pacientes.total * 100)}% do total` : "nenhum ainda"}
+                      />
+                      <StatCard
+                        label="Plano Semestral"
+                        value={data.pacientes.semestral}
+                        accent="purple" icon="📆"
+                        sub={data.pacientes.semestral > 0 ? `${Math.round(data.pacientes.semestral / data.pacientes.total * 100)}% do total` : "nenhum ainda"}
+                      />
+                      <StatCard
+                        label="Sem plano identificado"
+                        value={data.pacientes.total - data.pacientes.trimestral - data.pacientes.semestral}
+                        accent="yellow" icon="❓"
+                        sub="sem tag de plano"
+                      />
+                    </div>
+
+                    {/* Distribuição visual */}
+                    {(data.pacientes.trimestral + data.pacientes.semestral) > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* Barra de distribuição */}
+                        <div className="rounded-xl border border-border bg-card p-5">
+                          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">📊 Distribuição por plano</h3>
+                          <div className="space-y-4">
+                            {[
+                              { label: "Plano Trimestral", count: data.pacientes.trimestral, color: "#00d9f5", bg: "bg-cyan-400" },
+                              { label: "Plano Semestral", count: data.pacientes.semestral, color: "#a78bfa", bg: "bg-violet-400" },
+                            ].map(item => {
+                              const total = data.pacientes!.trimestral + data.pacientes!.semestral;
+                              const pct = Math.round((item.count / total) * 100);
+                              return (
+                                <div key={item.label}>
+                                  <div className="flex justify-between text-xs mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 rounded-sm" style={{ background: item.color }} />
+                                      <span className="font-medium">{item.label}</span>
+                                    </div>
+                                    <div className="flex gap-3">
+                                      <span className="font-bold stat-number" style={{ color: item.color }}>{item.count} pacientes</span>
+                                      <span className="text-muted-foreground">{pct}%</span>
+                                    </div>
+                                  </div>
+                                  <div className="w-full bg-secondary rounded-full h-2.5 overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-700 ${item.bg}`} style={{ width: `${pct}%` }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Mini visualização de proporção */}
+                          <div className="mt-5 pt-4 border-t border-border">
+                            <p className="text-xs text-muted-foreground mb-2">Proporção visual</p>
+                            <div className="flex h-6 rounded-lg overflow-hidden gap-0.5">
+                              {data.pacientes.trimestral > 0 && (
+                                <div className="bg-cyan-400 flex items-center justify-center text-[10px] font-bold text-background"
+                                  style={{ width: `${Math.round(data.pacientes.trimestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}%` }}>
+                                  {Math.round(data.pacientes.trimestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}%
+                                </div>
+                              )}
+                              {data.pacientes.semestral > 0 && (
+                                <div className="bg-violet-400 flex items-center justify-center text-[10px] font-bold text-background flex-1">
+                                  {Math.round(data.pacientes.semestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}%
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card de valor por plano estimado */}
+                        <div className="rounded-xl border border-border bg-card p-5">
+                          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">💡 Insights</h3>
+                          <div className="space-y-4">
+                            <div className="rounded-lg bg-secondary/60 px-4 py-3">
+                              <p className="text-xs text-muted-foreground mb-1">Total de pacientes no funil</p>
+                              <p className="text-2xl font-bold stat-number text-foreground">{data.pacientes.total}</p>
+                            </div>
+                            <div className="rounded-lg bg-secondary/60 px-4 py-3">
+                              <p className="text-xs text-muted-foreground mb-1">Ticket médio por paciente</p>
+                              <p className="text-2xl font-bold stat-number text-emerald-400">
+                                {data.pacientes.total > 0 ? BRL(Math.round(data.pacientes.revenue / data.pacientes.total)) : "—"}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-secondary/60 px-4 py-3">
+                              <p className="text-xs text-muted-foreground mb-1">Com tag de plano identificado</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex-1 bg-secondary rounded-full h-2 overflow-hidden">
+                                  <div className="h-full bg-emerald-400 rounded-full"
+                                    style={{ width: `${data.pacientes.total > 0 ? Math.round((data.pacientes.trimestral + data.pacientes.semestral) / data.pacientes.total * 100) : 0}%` }} />
+                                </div>
+                                <span className="text-sm font-bold text-emerald-400 stat-number">
+                                  {data.pacientes.total > 0 ? Math.round((data.pacientes.trimestral + data.pacientes.semestral) / data.pacientes.total * 100) : 0}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* ════ HISTORICO ════ */}
             {tab === "historico" && (
@@ -532,41 +744,6 @@ export default function Dashboard() {
                   <StatCard label="Leads ativos" value={data.totals.active} accent="cyan" icon="🔥"
                     sub={BRL(data.totals.active_value)} />
                 </div>
-
-                {/* Row 3c — Pacientes Ativos */}
-                {data.pacientes && (
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-emerald-400">
-                      <span>🏥</span> Pacientes Ativos
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <StatCard label="Faturamento total" value={BRL(data.pacientes.revenue)} accent="green" icon="💰"
-                        sub={`${data.pacientes.total} pacientes`} />
-                      <StatCard label="Plano Trimestral" value={data.pacientes.trimestral} accent="cyan" icon="📅"
-                        sub="pacientes ativos" />
-                      <StatCard label="Plano Semestral" value={data.pacientes.semestral} accent="purple" icon="📆"
-                        sub="pacientes ativos" />
-                      <div className="relative overflow-hidden rounded-xl border border-border bg-card/60 card-hover p-5">
-                        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-400 to-emerald-400 opacity-60" />
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Distribuição</p>
-                        {data.pacientes.trimestral + data.pacientes.semestral > 0 ? (
-                          <>
-                            <div className="flex gap-1 h-3 rounded-full overflow-hidden mt-3 mb-2">
-                              <div className="bg-cyan-400 rounded-l-full" style={{ width: `${Math.round(data.pacientes.trimestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}%` }} />
-                              <div className="bg-violet-400 rounded-r-full flex-1" />
-                            </div>
-                            <div className="flex justify-between text-xs mt-2">
-                              <span className="text-cyan-400">{Math.round(data.pacientes.trimestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}% trim</span>
-                              <span className="text-violet-400">{Math.round(data.pacientes.semestral / (data.pacientes.trimestral + data.pacientes.semestral) * 100)}% sem</span>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="text-xs text-muted-foreground mt-3">Sem tags de plano</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Row 4 — Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
