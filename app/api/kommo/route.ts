@@ -90,9 +90,23 @@ export async function POST(req: NextRequest) {
   const auth = req.cookies.get("auth");
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { subdomain: raw, token, pipeline_id } = await req.json();
-  if (!raw || !token) return NextResponse.json({ error: "Missing credentials" }, { status: 400 });
-  const subdomain = raw.replace(/^https?:\/\//, "").replace(/\.kommo\.com.*$/, "").trim();
+  let body: { subdomain?: string; token?: string; pipeline_id?: unknown };
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "Requisição inválida" }, { status: 400 });
+  }
+
+  const { subdomain: raw, token, pipeline_id: rawPid } = body;
+  if (!raw || !token) return NextResponse.json({ error: "Credenciais obrigatórias" }, { status: 400 });
+
+  const subdomain = String(raw).replace(/^https?:\/\//, "").replace(/\.kommo\.com.*$/, "").trim().toLowerCase();
+  if (!/^[a-z0-9-]{1,63}$/.test(subdomain)) {
+    return NextResponse.json({ error: "Subdomínio inválido" }, { status: 400 });
+  }
+
+  const safeToken = String(token).trim().slice(0, 2048);
+  const pipeline_id = rawPid != null && Number.isFinite(Number(rawPid)) && Number(rawPid) > 0
+    ? Math.floor(Number(rawPid))
+    : null;
 
   try {
     const ts = now();
@@ -104,8 +118,8 @@ export async function POST(req: NextRequest) {
 
     // === LOTE 1: Pipeline + Usuários ===
     const [pipelinesRes, usersRes] = await Promise.all([
-      kommoFetch(subdomain, token, "/leads/pipelines"),
-      kommoFetch(subdomain, token, "/users?limit=250").catch(() => ({})),
+      kommoFetch(subdomain, safeToken, "/leads/pipelines"),
+      kommoFetch(subdomain, safeToken, "/users?limit=250").catch(() => ({})),
     ]);
 
     const pipelines: { id: number; name: string; _embedded?: { statuses: { id: number; name: string }[] } }[] =
@@ -122,35 +136,35 @@ export async function POST(req: NextRequest) {
     await delay(150);
 
     // === LOTE 2: Período atual (sequencial para evitar rate limit) ===
-    const todayRes = await kommoFetch(subdomain, token,
+    const todayRes = await kommoFetch(subdomain, safeToken,
       `/leads?filter[created_at][from]=${todayTs}&filter[created_at][to]=${ts}&limit=250`);
     await delay(150);
 
-    const weekRes = await kommoFetch(subdomain, token,
+    const weekRes = await kommoFetch(subdomain, safeToken,
       `/leads?filter[created_at][from]=${weekTs}&filter[created_at][to]=${ts}&limit=250`);
     await delay(150);
 
-    const monthRes = await kommoFetch(subdomain, token,
+    const monthRes = await kommoFetch(subdomain, safeToken,
       `/leads?filter[created_at][from]=${monthTs}&filter[created_at][to]=${ts}&limit=250`);
     await delay(150);
 
-    const wonTodayRes = await kommoFetch(subdomain, token,
+    const wonTodayRes = await kommoFetch(subdomain, safeToken,
       `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142&limit=250`);
     await delay(150);
 
-    const lostTodayRes = await kommoFetch(subdomain, token,
+    const lostTodayRes = await kommoFetch(subdomain, safeToken,
       `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143&limit=250`);
     await delay(150);
 
-    const wonAllData = await kommoFetchLeads(subdomain, token,
+    const wonAllData = await kommoFetchLeads(subdomain, safeToken,
       `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142`);
     await delay(150);
 
-    const { count: lostCountPaginated } = await kommoFetchLeads(subdomain, token,
+    const { count: lostCountPaginated } = await kommoFetchLeads(subdomain, safeToken,
       `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143`);
     await delay(150);
 
-    const tasksRes = await kommoFetch(subdomain, token,
+    const tasksRes = await kommoFetch(subdomain, safeToken,
       `/tasks?filter[is_completed]=0&filter[till][to]=${ts}&limit=250`).catch(() => ({}));
     await delay(200);
 
@@ -164,13 +178,13 @@ export async function POST(req: NextRequest) {
       tasksFullRes,
       contactsWeekRes,
     ] = await Promise.all([
-      kommoFetch(subdomain, token, `/leads?filter[created_at][from]=${yesterdayFrom}&filter[created_at][to]=${yesterdayTo}&limit=250`).catch(() => ({})),
-      kommoFetch(subdomain, token, `/leads?filter[closed_at][from]=${yesterdayFrom}&filter[closed_at][to]=${yesterdayTo}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142&limit=250`).catch(() => ({})),
-      kommoFetch(subdomain, token, `/leads?filter[closed_at][from]=${yesterdayFrom}&filter[closed_at][to]=${yesterdayTo}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143&limit=250`).catch(() => ({})),
-      kommoFetch(subdomain, token, `/contacts?filter[created_at][from]=${todayTs}&limit=250`).catch(() => ({})),
-      kommoFetch(subdomain, token, `/leads?order[updated_at]=desc&filter[statuses][0][pipeline_id]=${pid}&limit=20`).catch(() => ({})),
-      kommoFetch(subdomain, token, `/tasks?filter[is_completed]=0&limit=50`).catch(() => ({})),
-      kommoFetch(subdomain, token, `/contacts?filter[created_at][from]=${weekTs}&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${yesterdayFrom}&filter[created_at][to]=${yesterdayTo}&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, safeToken, `/leads?filter[closed_at][from]=${yesterdayFrom}&filter[closed_at][to]=${yesterdayTo}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, safeToken, `/leads?filter[closed_at][from]=${yesterdayFrom}&filter[closed_at][to]=${yesterdayTo}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, safeToken, `/contacts?filter[created_at][from]=${todayTs}&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, safeToken, `/leads?order[updated_at]=desc&filter[statuses][0][pipeline_id]=${pid}&limit=20`).catch(() => ({})),
+      kommoFetch(subdomain, safeToken, `/tasks?filter[is_completed]=0&limit=50`).catch(() => ({})),
+      kommoFetch(subdomain, safeToken, `/contacts?filter[created_at][from]=${weekTs}&limit=250`).catch(() => ({})),
     ]);
 
     const todayLeads: LeadRaw[]     = todayRes._embedded?.leads || [];
@@ -215,7 +229,7 @@ export async function POST(req: NextRequest) {
 
     for (const s of statuses as { id: number; name: string }[]) {
       try {
-        const { count, value, leads } = await kommoFetchLeads(subdomain, token,
+        const { count, value, leads } = await kommoFetchLeads(subdomain, safeToken,
           `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=${s.id}`);
         funnel.push({ name: s.name, count, value, rate: 0 });
         allFunnelLeads.push(...leads);
@@ -325,7 +339,7 @@ export async function POST(req: NextRequest) {
       const to    = i === 0 ? ts : startOfDay(i - 1);
       const label = new Date(from * 1000).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
       try {
-        const d = await kommoFetch(subdomain, token,
+        const d = await kommoFetch(subdomain, safeToken,
           `/leads?filter[created_at][from]=${from}&filter[created_at][to]=${to}&limit=250`);
         const leads: unknown[] = d._embedded?.leads || [];
         daily.push({ date: label, count: leads.length });

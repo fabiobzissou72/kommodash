@@ -14,7 +14,8 @@
       "Bash(npx shadcn@latest init --defaults -y)",
       "Bash(npm run:*)",
       "Bash(node -e \"const p = require\\(''./node_modules/tailwindcss/package.json''\\); console.log\\(p.version\\)\")",
-      "Bash(curl -s \"https://tryapfsjmauclrojttnt.supabase.co/rest/v1/?select=*\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyeWFwZnNqbWF1Y2xyb2p0dG50Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTQyMDU1NywiZXhwIjoyMDg2OTk2NTU3fQ.LZtwzfSdgefcJH__cfcMyojS2cz3eJ84q8Qzr6Et-rI\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyeWFwZnNqbWF1Y2xyb2p0dG50Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTQyMDU1NywiZXhwIjoyMDg2OTk2NTU3fQ.LZtwzfSdgefcJH__cfcMyojS2cz3eJ84q8Qzr6Et-rI\")"
+      "Bash(curl -s \"https://tryapfsjmauclrojttnt.supabase.co/rest/v1/?select=*\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyeWFwZnNqbWF1Y2xyb2p0dG50Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTQyMDU1NywiZXhwIjoyMDg2OTk2NTU3fQ.LZtwzfSdgefcJH__cfcMyojS2cz3eJ84q8Qzr6Et-rI\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyeWFwZnNqbWF1Y2xyb2p0dG50Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTQyMDU1NywiZXhwIjoyMDg2OTk2NTU3fQ.LZtwzfSdgefcJH__cfcMyojS2cz3eJ84q8Qzr6Et-rI\")",
+      "Bash(npx vercel:*)"
     ]
   }
 }
