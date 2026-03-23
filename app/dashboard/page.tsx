@@ -39,7 +39,7 @@ type DashData = {
   recent_activity: ActivityItem[];
   tasks_list: TaskItem[];
   active_by_user: ActiveByUser[];
-  pacientes: { total: number; revenue: number; trimestral: number; semestral: number } | null;
+  pacientes: { total: number; revenue: number; trimestral: number; semestral: number; pipeline_name: string } | null;
 };
 type SnapshotRow = {
   snapshot_date: string;
@@ -400,7 +400,7 @@ export default function Dashboard() {
                         <span className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-sm">🏥</span>
                         Pacientes Ativos
                       </h2>
-                      <p className="text-xs text-muted-foreground mt-1">Funil "Pacientes Ativos" · faturamento por plano fechado</p>
+                      <p className="text-xs text-muted-foreground mt-1">Funil "{data?.pacientes?.pipeline_name || "Pacientes Ativos"}" · faturamento por plano fechado</p>
                     </div>
                     {/* Configurar Meta */}
                     <div className="flex items-center gap-2">
@@ -457,9 +457,11 @@ export default function Dashboard() {
                       ↑ Configure uma meta mensal acima para ver o progresso
                     </p>
                   )}
-                  {!data?.pacientes && (
-                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-xs text-amber-400">
-                      ⚠ Pipeline "Pacientes Ativos" não encontrado nesta conta. Verifique se o nome está exato no Kommo.
+                  {data && !data.pacientes && (
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-xs text-amber-400 space-y-1">
+                      <p>⚠ Nenhum pipeline com "paciente" no nome foi encontrado.</p>
+                      <p className="text-muted-foreground">Pipelines disponíveis: <span className="text-foreground">{data.pipelines.map(p => `"${p.name}"`).join(" · ")}</span></p>
+                      <p className="text-muted-foreground">O pipeline precisa ter a palavra <span className="text-amber-400 font-semibold">paciente</span> no nome.</p>
                     </div>
                   )}
                 </div>

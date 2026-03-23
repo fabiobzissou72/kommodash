@@ -227,9 +227,9 @@ export async function POST(req: NextRequest) {
 
     // === LOTE 2c: Pacientes Ativos ===
     const pacientesPipeline = pipelines.find(p =>
-      p.name.toLowerCase().replace(/\s+/g, " ").trim() === "pacientes ativos"
+      p.name.toLowerCase().replace(/\s+/g, " ").trim().includes("paciente")
     );
-    let pacientes: { total: number; revenue: number; trimestral: number; semestral: number } | null = null;
+    let pacientes: { total: number; revenue: number; trimestral: number; semestral: number; pipeline_name: string } | null = null;
     if (pacientesPipeline) {
       const pacData = await kommoFetchLeads(subdomain, safeToken,
         `/leads?filter[pipeline_id]=${pacientesPipeline.id}&with=tags`, 20);
@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
       const sem = pacData.leads.filter(l =>
         l._embedded?.tags?.some(t => t.name.toLowerCase() === "plano semestral")
       ).length;
-      pacientes = { total: pacData.count, revenue: pacData.value, trimestral: trim, semestral: sem };
+      pacientes = { total: pacData.count, revenue: pacData.value, trimestral: trim, semestral: sem, pipeline_name: pacientesPipeline.name };
       await delay(200);
     }
 
