@@ -21,6 +21,15 @@ type LeadRaw = {
   updated_at: number;
 };
 
+type TaskRaw = {
+  id: number;
+  text: string;
+  complete_till: number;
+  element_id: number;
+  element_type: number;
+  responsible_user_id: number;
+};
+
 async function kommoFetch(subdomain: string, token: string, path: string) {
   const res = await axios.get(`https://${subdomain}.kommo.com/api/v4${path}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -33,7 +42,6 @@ async function kommoFetch(subdomain: string, token: string, path: string) {
   return res.data;
 }
 
-// Busca leads paginando (até maxPages páginas), retorna count, value e leads
 async function kommoFetchLeads(
   subdomain: string, token: string, path: string, maxPages = 5
 ): Promise<{ count: number; value: number; leads: LeadRaw[] }> {
@@ -70,6 +78,13 @@ function startOfMonth() {
   const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0);
   return Math.floor(d.getTime() / 1000);
 }
+function timeAgo(ts: number): string {
+  const diff = Math.floor(Date.now() / 1000) - ts;
+  if (diff < 60) return "agora";
+  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
 
 export async function POST(req: NextRequest) {
   const auth = req.cookies.get("auth");
@@ -81,11 +96,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const ts = now();
-    const todayTs  = startOfDay();
-    const weekTs   = startOfWeek();
-    const monthTs  = startOfMonth();
+    const todayTs   = startOfDay();
+    const weekTs    = startOfWeek();
+    const monthTs   = startOfMonth();
+    const yesterdayFrom = startOfDay(1);
+    const yesterdayTo   = startOfDay(0);
 
-    // === LOTE 1: Pipeline info + Usuários ===
+    // === LOTE 1: Pipeline + Usuários ===
     const [pipelinesRes, usersRes] = await Promise.all([
       kommoFetch(subdomain, token, "/leads/pipelines"),
       kommoFetch(subdomain, token, "/users?limit=250").catch(() => ({})),
@@ -98,14 +115,13 @@ export async function POST(req: NextRequest) {
     const pipeline = pipelines.find(p => p.id === pid) || pipelines[0];
     const statuses = (pipeline?._embedded?.statuses || []).filter((s: { id: number }) => s.id !== 142 && s.id !== 143);
 
-    // Mapa de usuários: id → nome
     const userMap: Record<number, string> = {};
     const usersList: { id: number; name: string }[] = usersRes._embedded?.users || [];
     usersList.forEach(u => { userMap[u.id] = u.name; });
 
     await delay(150);
 
-    // === LOTE 2: Métricas do período (sequencial) ===
+    // === LOTE 2: Período atual (sequencial para evitar rate limit) ===
     const todayRes = await kommoFetch(subdomain, token,
       `/leads?filter[created_at][from]=${todayTs}&filter[created_at][to]=${ts}&limit=250`);
     await delay(150);
@@ -138,11 +154,38 @@ export async function POST(req: NextRequest) {
       `/tasks?filter[is_completed]=0&filter[till][to]=${ts}&limit=250`).catch(() => ({}));
     await delay(200);
 
+    // === LOTE 2b: Ontem + Contatos + Atividade + Tarefas completas ===
+    const [
+      yesterdayLeadsRes,
+      wonYesterdayRes,
+      lostYesterdayRes,
+      contactsTodayRes,
+      recentActivityRes,
+      tasksFullRes,
+      contactsWeekRes,
+    ] = await Promise.all([
+      kommoFetch(subdomain, token, `/leads?filter[created_at][from]=${yesterdayFrom}&filter[created_at][to]=${yesterdayTo}&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, token, `/leads?filter[closed_at][from]=${yesterdayFrom}&filter[closed_at][to]=${yesterdayTo}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, token, `/leads?filter[closed_at][from]=${yesterdayFrom}&filter[closed_at][to]=${yesterdayTo}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, token, `/contacts?filter[created_at][from]=${todayTs}&limit=250`).catch(() => ({})),
+      kommoFetch(subdomain, token, `/leads?order[updated_at]=desc&filter[statuses][0][pipeline_id]=${pid}&limit=20`).catch(() => ({})),
+      kommoFetch(subdomain, token, `/tasks?filter[is_completed]=0&limit=50`).catch(() => ({})),
+      kommoFetch(subdomain, token, `/contacts?filter[created_at][from]=${weekTs}&limit=250`).catch(() => ({})),
+    ]);
+
     const todayLeads: LeadRaw[]     = todayRes._embedded?.leads || [];
     const wonTodayLeads: LeadRaw[]  = wonTodayRes._embedded?.leads || [];
     const lostTodayLeads: LeadRaw[] = lostTodayRes._embedded?.leads || [];
     const wonAllLeads: LeadRaw[]    = wonAllData.leads;
-    const overdueTasks              = (tasksRes as { _embedded?: { tasks?: unknown[] } })._embedded?.tasks || [];
+    const overdueTasks              = (tasksRes as any)._embedded?.tasks || [];
+
+    const yesterdayLeadsCount = (yesterdayLeadsRes as any)._embedded?.leads?.length || 0;
+    const yesterdayWonCount   = (wonYesterdayRes as any)._embedded?.leads?.length || 0;
+    const yesterdayLostCount  = (lostYesterdayRes as any)._embedded?.leads?.length || 0;
+    const contactsToday       = (contactsTodayRes as any)._embedded?.contacts?.length || 0;
+    const contactsWeek        = (contactsWeekRes as any)._embedded?.contacts?.length || 0;
+    const recentActivityRaw: LeadRaw[] = (recentActivityRes as any)._embedded?.leads || [];
+    const tasksFullList: TaskRaw[]     = (tasksFullRes as any)._embedded?.tasks || [];
 
     const revenueToday = wonTodayLeads.reduce((s, l) => s + (l.price || 0), 0);
     const wonAllValue  = wonAllData.value;
@@ -152,24 +195,11 @@ export async function POST(req: NextRequest) {
     const convRate     = (wonCount + lostCount) > 0
       ? Math.round((wonCount / (wonCount + lostCount)) * 100) : 0;
 
-    // Tempo médio de fechamento (criação → ganho) em horas
     const wonWithClose = wonAllLeads.filter(l => l.closed_at && l.created_at);
     const avgCloseHours = wonWithClose.length > 0
       ? Math.round(wonWithClose.reduce((s, l) => s + ((l.closed_at! - l.created_at) / 3600), 0) / wonWithClose.length)
       : 0;
 
-    // Ranking por vendedor (leads ganhos)
-    const rankingMap: Record<number, { name: string; won: number }> = {};
-    wonAllLeads.forEach(l => {
-      const uid = l.responsible_user_id;
-      if (!rankingMap[uid]) rankingMap[uid] = { name: userMap[uid] || `User ${uid}`, won: 0 };
-      rankingMap[uid].won++;
-    });
-    const ranking = Object.values(rankingMap)
-      .sort((a, b) => b.won - a.won)
-      .slice(0, 10);
-
-    // Hourly today
     const hourlyMap: Record<string, number> = {};
     for (let h = 0; h < 24; h++) hourlyMap[String(h).padStart(2, "0") + "h"] = 0;
     todayLeads.forEach(l => {
@@ -179,7 +209,7 @@ export async function POST(req: NextRequest) {
     });
     const hourly = Object.entries(hourlyMap).map(([hour, count]) => ({ hour, count }));
 
-    // === LOTE 3: Funil por etapa (sequencial) — coleta leads também ===
+    // === LOTE 3: Funil por etapa ===
     const funnel: { name: string; count: number; value: number; rate: number }[] = [];
     const allFunnelLeads: LeadRaw[] = [];
 
@@ -195,38 +225,31 @@ export async function POST(req: NextRequest) {
       await delay(200);
     }
 
-    // Taxa de conversão por etapa (em relação à primeira etapa)
     const firstCount = funnel[0]?.count || 1;
     funnel.forEach(f => {
       f.rate = firstCount > 0 ? Math.round((f.count / firstCount) * 100) : 0;
     });
 
-    // Top 10 leads mais valiosos (ativos no funil)
+    // Top leads por valor
     const topLeads = [...allFunnelLeads]
       .filter(l => l.price > 0)
       .sort((a, b) => b.price - a.price)
       .slice(0, 10)
-      .map(l => {
-        const stage = funnel.find(f => f.name && statuses.find((s: { id: number; name: string }) => s.id === l.status_id && s.name === f.name));
-        const stageName = (statuses as { id: number; name: string }[]).find(s => s.id === l.status_id)?.name || "—";
-        return {
-          id: l.id,
-          name: l.name || `Lead #${l.id}`,
-          price: l.price,
-          stage: stageName,
-          responsible: userMap[l.responsible_user_id] || `User ${l.responsible_user_id}`,
-        };
-      });
+      .map(l => ({
+        id: l.id,
+        name: l.name || `Lead #${l.id}`,
+        price: l.price,
+        stage: (statuses as { id: number; name: string }[]).find(s => s.id === l.status_id)?.name || "—",
+        responsible: userMap[l.responsible_user_id] || `User ${l.responsible_user_id}`,
+      }));
 
-    // Ranking por responsável nos leads ativos (funil)
+    // Ranking vendedores
     const activeRankMap: Record<number, { name: string; won: number; active: number }> = {};
-    // won
     wonAllLeads.forEach(l => {
       const uid = l.responsible_user_id;
       if (!activeRankMap[uid]) activeRankMap[uid] = { name: userMap[uid] || `User ${uid}`, won: 0, active: 0 };
       activeRankMap[uid].won++;
     });
-    // active
     allFunnelLeads.forEach(l => {
       const uid = l.responsible_user_id;
       if (!activeRankMap[uid]) activeRankMap[uid] = { name: userMap[uid] || `User ${uid}`, won: 0, active: 0 };
@@ -236,7 +259,66 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => b.won - a.won || b.active - a.active)
       .slice(0, 10);
 
-    // === LOTE 4: Histórico 30 dias (sequencial) ===
+    // Hot leads (maior valor + mais recentemente atualizados)
+    const hotLeads = [...allFunnelLeads]
+      .filter(l => l.price > 0)
+      .sort((a, b) => b.updated_at - a.updated_at)
+      .slice(0, 10)
+      .map(l => ({
+        id: l.id,
+        name: l.name || `Lead #${l.id}`,
+        price: l.price,
+        stage: (statuses as { id: number; name: string }[]).find(s => s.id === l.status_id)?.name || "—",
+        responsible: userMap[l.responsible_user_id] || `User ${l.responsible_user_id}`,
+        updated_ago: timeAgo(l.updated_at),
+      }));
+
+    // Atividade recente (leads atualizados recentemente no pipeline)
+    const allLeadsByPipeline = allFunnelLeads;
+    const recentActivity = recentActivityRaw
+      .map(l => ({
+        id: l.id,
+        name: l.name || `Lead #${l.id}`,
+        price: l.price || 0,
+        stage: (statuses as { id: number; name: string }[]).find(s => s.id === l.status_id)?.name || "—",
+        responsible: userMap[l.responsible_user_id] || `User ${l.responsible_user_id}`,
+        updated_ago: timeAgo(l.updated_at),
+      }));
+
+    // Tarefas com nome do lead
+    const allLeadsForTasks = [...allFunnelLeads, ...wonAllLeads];
+    const tasksList = tasksFullList
+      .map(t => {
+        const leadObj = allLeadsForTasks.find(l => l.id === t.element_id);
+        return {
+          id: t.id,
+          text: t.text || "Tarefa",
+          complete_till: t.complete_till,
+          lead_id: t.element_id,
+          lead_name: leadObj?.name || (t.element_id ? `Lead #${t.element_id}` : "—"),
+          responsible: userMap[t.responsible_user_id] || `User ${t.responsible_user_id}`,
+          overdue: t.complete_till > 0 && t.complete_till < ts,
+        };
+      })
+      .sort((a, b) => a.complete_till - b.complete_till)
+      .slice(0, 25);
+
+    // Distribuição por responsável nos leads ativos
+    const activeByUser: { name: string; count: number; value: number }[] = Object.entries(
+      allFunnelLeads.reduce((acc, l) => {
+        const uid = l.responsible_user_id;
+        const name = userMap[uid] || `User ${uid}`;
+        if (!acc[uid]) acc[uid] = { name, count: 0, value: 0 };
+        acc[uid].count++;
+        acc[uid].value += l.price || 0;
+        return acc;
+      }, {} as Record<number, { name: string; count: number; value: number }>)
+    )
+      .map(([, v]) => v)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    // === LOTE 4: Histórico 30 dias ===
     const daily: { date: string; count: number }[] = [];
     for (let i = 29; i >= 0; i--) {
       const from  = startOfDay(i);
@@ -256,6 +338,16 @@ export async function POST(req: NextRequest) {
     const activeCount = funnel.reduce((s, f) => s + f.count, 0);
     const activeValue = funnel.reduce((s, f) => s + f.value, 0);
 
+    // Revenue won week
+    const revenueWonWeek = wonAllLeads
+      .filter(l => l.closed_at && l.closed_at >= weekTs)
+      .reduce((s, l) => s + (l.price || 0), 0);
+
+    // Revenue won month
+    const revenueWonMonth = wonAllLeads
+      .filter(l => l.closed_at && l.closed_at >= monthTs)
+      .reduce((s, l) => s + (l.price || 0), 0);
+
     const result = {
       pipeline: { id: pid, name: pipeline?.name || "" },
       pipelines: pipelines.map(p => ({ id: p.id, name: p.name })),
@@ -265,8 +357,23 @@ export async function POST(req: NextRequest) {
         lost:    lostTodayLeads.length,
         revenue: revenueToday,
       },
-      week:  { leads: (weekRes._embedded?.leads || []).length },
-      month: { leads: (monthRes._embedded?.leads || []).length },
+      yesterday: {
+        leads: yesterdayLeadsCount,
+        won:   yesterdayWonCount,
+        lost:  yesterdayLostCount,
+      },
+      week:  {
+        leads: (weekRes._embedded?.leads || []).length,
+        revenue: revenueWonWeek,
+      },
+      month: {
+        leads: (monthRes._embedded?.leads || []).length,
+        revenue: revenueWonMonth,
+      },
+      contacts: {
+        today: contactsToday,
+        week:  contactsWeek,
+      },
       funnel,
       daily,
       hourly,
@@ -277,6 +384,10 @@ export async function POST(req: NextRequest) {
       overdue_tasks: overdueTasks.length,
       ranking: fullRanking,
       top_leads: topLeads,
+      hot_leads: hotLeads,
+      recent_activity: recentActivity,
+      tasks_list: tasksList,
+      active_by_user: activeByUser,
     };
 
     // Snapshot Supabase
