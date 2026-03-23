@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+}
 
 // Rate limiting simples em memória (por IP)
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
 
   const sanitizedEmail = String(email).toLowerCase().trim().slice(0, 254);
 
+  const supabase = getSupabase();
   const { data: user } = await supabase
     .from("dashboard_users")
     .select("id, email, name, password_hash, role")

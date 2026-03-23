@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+}
 
 function checkAuth(req: NextRequest) {
   const auth = req.cookies.get("auth");
@@ -25,6 +26,7 @@ function sanitizeSubdomain(raw: string): string | null {
 export async function GET(req: NextRequest) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from("accounts")
     .select("id, label, subdomain, token")
@@ -55,6 +57,7 @@ export async function POST(req: NextRequest) {
   const sanitizedLabel = String(label).trim().slice(0, 100);
   const sanitizedToken = String(token).trim().slice(0, 2048);
 
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from("accounts")
     .upsert({ label: sanitizedLabel, subdomain: clean, token: sanitizedToken }, { onConflict: "subdomain" })
@@ -79,6 +82,7 @@ export async function DELETE(req: NextRequest) {
   const clean = sanitizeSubdomain(subdomain);
   if (!clean) return NextResponse.json({ error: "Subdomínio inválido" }, { status: 400 });
 
+  const supabase = getSupabase();
   const { error } = await supabase.from("accounts").delete().eq("subdomain", clean);
   if (error) return NextResponse.json({ error: "Erro ao deletar conta" }, { status: 500 });
   return NextResponse.json({ ok: true });

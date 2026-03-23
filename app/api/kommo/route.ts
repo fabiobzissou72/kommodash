@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import axios from "axios";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+}
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -406,7 +407,7 @@ export async function POST(req: NextRequest) {
 
     // Snapshot Supabase
     const brDate = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().split("T")[0];
-    supabase.from("kommo_snapshots").upsert({
+    getSupabase().from("kommo_snapshots").upsert({
       account_subdomain: subdomain,
       pipeline_id: pid,
       pipeline_name: pipeline?.name || "",

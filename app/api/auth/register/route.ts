@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+}
 
 function validatePassword(pass: string): string | null {
   if (pass.length < 8) return "Senha deve ter pelo menos 8 caracteres";
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
 
   const password_hash = await bcrypt.hash(String(pass), 12);
 
+  const supabase = getSupabase();
   const { error } = await supabase.from("dashboard_users").insert({
     name: sanitizedName,
     email: sanitizedEmail,
