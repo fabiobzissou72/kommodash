@@ -195,17 +195,26 @@ export default function Dashboard() {
   async function analyzeLeadIA() {
     if (!selectedLead || !accounts[activeAcc]) return;
     setAnalyzing(true); setAnalysisResult(null); setAnalysisError("");
+    const acc = accounts[activeAcc];
+    let res: Response | null = null;
     try {
-      const acc = accounts[activeAcc];
-      const res = await fetch("/api/analyze", {
+      res = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subdomain: acc.subdomain, token: acc.token, lead_id: selectedLead.id, contact_id: selectedLead.contact_id }),
       });
-      let json: any;
-      try { json = await res.json(); } catch { setAnalysisError("Timeout: a análise demorou demais. Tente novamente."); return; }
-      if (json.error) setAnalysisError(json.error);
-      else setAnalysisResult(json);
-    } catch (e: any) { setAnalysisError("Erro: " + (e?.message || "conexão falhou")); } finally { setAnalyzing(false); }
+    } catch {
+      setAnalysisError("Sem conexão com o servidor. Tente novamente.");
+      setAnalyzing(false); return;
+    }
+    let json: any = null;
+    try { json = await res.json(); } catch {
+      setAnalysisError("A análise demorou demais. Tente novamente.");
+      setAnalyzing(false); return;
+    }
+    if (!json) { setAnalysisError("Resposta vazia do servidor."); setAnalyzing(false); return; }
+    if (json.error) setAnalysisError(json.error);
+    else setAnalysisResult(json);
+    setAnalyzing(false);
   }
 
   useEffect(() => {
