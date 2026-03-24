@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 // Rotas que NÃO precisam de autenticação
 const PUBLIC_PATHS = ["/", "/api/auth"];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Libera rotas públicas
