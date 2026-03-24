@@ -109,6 +109,9 @@ export async function POST(req: NextRequest) {
         .join("\n");
     }
 
+    // DEBUG: retorna antes do OpenAI para isolar o problema
+    return NextResponse.json({ debug: true, source, notes_count: messageCount, historyLen: historyText.length });
+
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
