@@ -229,17 +229,35 @@ export async function POST(req: NextRequest) {
     const pacientesPipeline = pipelines.find(p =>
       p.name.toLowerCase().replace(/\s+/g, " ").trim().includes("paciente")
     );
-    let pacientes: { total: number; revenue: number; trimestral: number; semestral: number; pipeline_name: string } | null = null;
+    let pacientes: { total: number; revenue: number; trimestral: number; semestral: number; pipeline_name: string; revenue_trimestral: number; revenue_semestral: number; avg_ticket_trimestral: number; avg_ticket_semestral: number; mrr: number } | null = null;
     if (pacientesPipeline) {
       const pacData = await kommoFetchLeads(subdomain, safeToken,
         `/leads?filter[pipeline_id]=${pacientesPipeline.id}&with=tags`, 20);
-      const trim = pacData.leads.filter(l =>
+      const trimLeads = pacData.leads.filter(l =>
         l._embedded?.tags?.some(t => t.name.toLowerCase() === "plano trimestral")
-      ).length;
-      const sem = pacData.leads.filter(l =>
+      );
+      const semLeads = pacData.leads.filter(l =>
         l._embedded?.tags?.some(t => t.name.toLowerCase() === "plano semestral")
-      ).length;
-      pacientes = { total: pacData.count, revenue: pacData.value, trimestral: trim, semestral: sem, pipeline_name: pacientesPipeline.name };
+      );
+      const trim = trimLeads.length;
+      const sem = semLeads.length;
+      const revenue_trimestral = trimLeads.reduce((s, l) => s + (l.price || 0), 0);
+      const revenue_semestral = semLeads.reduce((s, l) => s + (l.price || 0), 0);
+      const avg_ticket_trimestral = trim > 0 ? Math.round(revenue_trimestral / trim) : 0;
+      const avg_ticket_semestral = sem > 0 ? Math.round(revenue_semestral / sem) : 0;
+      const mrr = Math.round(pacData.value / 3);
+      pacientes = {
+        total: pacData.count,
+        revenue: pacData.value,
+        trimestral: trim,
+        semestral: sem,
+        pipeline_name: pacientesPipeline.name,
+        revenue_trimestral,
+        revenue_semestral,
+        avg_ticket_trimestral,
+        avg_ticket_semestral,
+        mrr,
+      };
       await delay(200);
     }
 
@@ -369,6 +387,9 @@ export async function POST(req: NextRequest) {
       await delay(150);
     }
 
+    const bugIaStage = funnel.find(f => f.name.toLowerCase().includes("bug"));
+    const bug_ia = bugIaStage?.count || 0;
+
     const activeCount = funnel.reduce((s, f) => s + f.count, 0);
     const activeValue = funnel.reduce((s, f) => s + f.value, 0);
 
@@ -423,6 +444,7 @@ export async function POST(req: NextRequest) {
       tasks_list: tasksList,
       active_by_user: activeByUser,
       pacientes,
+      bug_ia,
     };
 
     // Snapshot Supabase

@@ -39,7 +39,8 @@ type DashData = {
   recent_activity: ActivityItem[];
   tasks_list: TaskItem[];
   active_by_user: ActiveByUser[];
-  pacientes: { total: number; revenue: number; trimestral: number; semestral: number; pipeline_name: string } | null;
+  pacientes: { total: number; revenue: number; trimestral: number; semestral: number; pipeline_name: string; revenue_trimestral: number; revenue_semestral: number; avg_ticket_trimestral: number; avg_ticket_semestral: number; mrr: number } | null;
+  bug_ia: number;
 };
 type SnapshotRow = {
   snapshot_date: string;
@@ -469,6 +470,7 @@ export default function Dashboard() {
                 {/* Stats cards */}
                 {data?.pacientes && (
                   <>
+                    {/* Row 1 — Volume */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <StatCard
                         label="Faturamento total"
@@ -477,10 +479,38 @@ export default function Dashboard() {
                         sub={`${data.pacientes.total} pacientes no funil`}
                       />
                       <StatCard
+                        label="MRR estimado"
+                        value={BRL(data.pacientes.mrr)}
+                        accent="cyan" icon="📈"
+                        sub="receita mensal recorrente"
+                      />
+                      <StatCard
+                        label="Ticket médio"
+                        value={data.pacientes.total > 0 ? BRL(Math.round(data.pacientes.revenue / data.pacientes.total)) : "—"}
+                        accent="orange" icon="🎯"
+                        sub="por paciente"
+                      />
+                      <StatCard
+                        label="Sem plano identificado"
+                        value={data.pacientes.total - data.pacientes.trimestral - data.pacientes.semestral}
+                        accent="yellow" icon="❓"
+                        sub="sem tag de plano"
+                      />
+                    </div>
+
+                    {/* Row 2 — Por plano */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <StatCard
                         label="Plano Trimestral"
                         value={data.pacientes.trimestral}
                         accent="cyan" icon="📅"
                         sub={data.pacientes.trimestral > 0 ? `${Math.round(data.pacientes.trimestral / data.pacientes.total * 100)}% do total` : "nenhum ainda"}
+                      />
+                      <StatCard
+                        label="Fat. Trimestral"
+                        value={BRL(data.pacientes.revenue_trimestral)}
+                        accent="cyan" icon="💵"
+                        sub={data.pacientes.avg_ticket_trimestral > 0 ? `ticket médio ${BRL(data.pacientes.avg_ticket_trimestral)}` : "—"}
                       />
                       <StatCard
                         label="Plano Semestral"
@@ -489,10 +519,10 @@ export default function Dashboard() {
                         sub={data.pacientes.semestral > 0 ? `${Math.round(data.pacientes.semestral / data.pacientes.total * 100)}% do total` : "nenhum ainda"}
                       />
                       <StatCard
-                        label="Sem plano identificado"
-                        value={data.pacientes.total - data.pacientes.trimestral - data.pacientes.semestral}
-                        accent="yellow" icon="❓"
-                        sub="sem tag de plano"
+                        label="Fat. Semestral"
+                        value={BRL(data.pacientes.revenue_semestral)}
+                        accent="purple" icon="💵"
+                        sub={data.pacientes.avg_ticket_semestral > 0 ? `ticket médio ${BRL(data.pacientes.avg_ticket_semestral)}` : "—"}
                       />
                     </div>
 
@@ -549,20 +579,10 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-                        {/* Card de valor por plano estimado */}
+                        {/* Card de insights estratégicos */}
                         <div className="rounded-xl border border-border bg-card p-5">
-                          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">💡 Insights</h3>
-                          <div className="space-y-4">
-                            <div className="rounded-lg bg-secondary/60 px-4 py-3">
-                              <p className="text-xs text-muted-foreground mb-1">Total de pacientes no funil</p>
-                              <p className="text-2xl font-bold stat-number text-foreground">{data.pacientes.total}</p>
-                            </div>
-                            <div className="rounded-lg bg-secondary/60 px-4 py-3">
-                              <p className="text-xs text-muted-foreground mb-1">Ticket médio por paciente</p>
-                              <p className="text-2xl font-bold stat-number text-emerald-400">
-                                {data.pacientes.total > 0 ? BRL(Math.round(data.pacientes.revenue / data.pacientes.total)) : "—"}
-                              </p>
-                            </div>
+                          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">💡 Insights estratégicos</h3>
+                          <div className="space-y-3">
                             <div className="rounded-lg bg-secondary/60 px-4 py-3">
                               <p className="text-xs text-muted-foreground mb-1">Com tag de plano identificado</p>
                               <div className="flex items-center gap-2 mt-1">
@@ -575,6 +595,55 @@ export default function Dashboard() {
                                 </span>
                               </div>
                             </div>
+                            {/* Insight semestral estratégico */}
+                            {data.pacientes.semestral > 0 && data.pacientes.trimestral > 0 && (() => {
+                              const totalTagged = data.pacientes.trimestral + data.pacientes.semestral;
+                              const semPct = Math.round(data.pacientes.semestral / totalTagged * 100);
+                              const mrrSe50 = data.pacientes.avg_ticket_trimestral > 0 && data.pacientes.avg_ticket_semestral > 0
+                                ? Math.round((totalTagged * 0.5 * data.pacientes.avg_ticket_semestral / 6) + (totalTagged * 0.5 * data.pacientes.avg_ticket_trimestral / 3))
+                                : null;
+                              return (
+                                <div className={`rounded-lg px-4 py-3 border ${semPct >= 50 ? "bg-emerald-500/8 border-emerald-500/20" : "bg-violet-500/8 border-violet-500/20"}`}>
+                                  <p className="text-xs text-muted-foreground mb-1">Plano semestral hoje</p>
+                                  <p className="text-lg font-bold stat-number text-violet-400">{semPct}% da base</p>
+                                  {semPct < 50 && mrrSe50 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Aumentar para 50% → MRR estimado{" "}
+                                      <span className="text-emerald-400 font-semibold">{BRL(mrrSe50)}/mês</span>
+                                    </p>
+                                  )}
+                                  {semPct >= 50 && <p className="text-xs text-emerald-400 mt-1">Base majoritariamente semestral — ótimo para LTV!</p>}
+                                </div>
+                              );
+                            })()}
+                            {/* LTV por plano */}
+                            {(data.pacientes.avg_ticket_trimestral > 0 || data.pacientes.avg_ticket_semestral > 0) && (
+                              <div className="rounded-lg bg-secondary/60 px-4 py-3">
+                                <p className="text-xs text-muted-foreground mb-2">LTV estimado por plano</p>
+                                <div className="flex gap-4">
+                                  {data.pacientes.avg_ticket_trimestral > 0 && (
+                                    <div>
+                                      <p className="text-[10px] text-muted-foreground">Trimestral</p>
+                                      <p className="text-sm font-bold text-cyan-400 stat-number">{BRL(data.pacientes.avg_ticket_trimestral)}</p>
+                                    </div>
+                                  )}
+                                  {data.pacientes.avg_ticket_semestral > 0 && (
+                                    <div>
+                                      <p className="text-[10px] text-muted-foreground">Semestral</p>
+                                      <p className="text-sm font-bold text-violet-400 stat-number">{BRL(data.pacientes.avg_ticket_semestral)}</p>
+                                    </div>
+                                  )}
+                                  {data.pacientes.avg_ticket_trimestral > 0 && data.pacientes.avg_ticket_semestral > 0 && (
+                                    <div>
+                                      <p className="text-[10px] text-muted-foreground">Semestral vale</p>
+                                      <p className="text-sm font-bold text-emerald-400 stat-number">
+                                        {(data.pacientes.avg_ticket_semestral / data.pacientes.avg_ticket_trimestral).toFixed(1)}× mais
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -746,6 +815,32 @@ export default function Dashboard() {
                   <StatCard label="Leads ativos" value={data.totals.active} accent="cyan" icon="🔥"
                     sub={BRL(data.totals.active_value)} />
                 </div>
+
+                {/* Alertas Operacionais */}
+                {(() => {
+                  const alerts: { icon: string; label: string; desc: string; severity: "high" | "med" | "low" }[] = [];
+                  if (data.bug_ia > 0) alerts.push({ icon: "🤖", label: `${data.bug_ia} leads em Bug IA`, desc: "Fluxo quebrado — triagem manual urgente", severity: "high" });
+                  if (data.overdue_tasks > 0) alerts.push({ icon: "⏰", label: `${data.overdue_tasks} tarefas atrasadas`, desc: "Com prazo vencido, ação necessária", severity: "high" });
+                  if (meta === 0) alerts.push({ icon: "🎯", label: "Meta mensal não definida", desc: "Configure a meta na aba Pacientes", severity: "med" });
+                  if (data.avg_close_hours > 72) alerts.push({ icon: "🐢", label: `Tempo de fechamento ${data.avg_close_hours}h`, desc: "Acima do ideal de 72h — verificar gargalo", severity: "med" });
+                  if (alerts.length === 0) return null;
+                  return (
+                    <div className="rounded-xl border border-border bg-card p-5">
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">⚠️ Alertas operacionais</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {alerts.map((a, i) => (
+                          <div key={i} className={`flex items-start gap-3 rounded-lg px-3 py-2.5 border ${a.severity === "high" ? "bg-rose-500/8 border-rose-500/20" : "bg-amber-500/8 border-amber-500/20"}`}>
+                            <span className="text-base mt-0.5">{a.icon}</span>
+                            <div>
+                              <p className={`text-xs font-semibold ${a.severity === "high" ? "text-rose-400" : "text-amber-400"}`}>{a.label}</p>
+                              <p className="text-xs text-muted-foreground">{a.desc}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Row 4 — Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
