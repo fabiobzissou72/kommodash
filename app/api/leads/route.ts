@@ -30,14 +30,18 @@ export async function POST(req: NextRequest) {
   if (pipeline_id) params.set("filter[pipeline_id]", pipeline_id);
   if (query) params.set("query", query);
 
-  const data = await kommoGet(clean, token, `/leads?${params}`);
-  const leads = (data._embedded?.leads || []).map((l: any) => ({
-    id: l.id,
-    name: l.name || `Lead #${l.id}`,
-    stage: statuses[l.status_id] || "Desconhecido",
-    price: l.price || 0,
-    created_at: l.created_at,
-  }));
+  const data = await kommoGet(clean, token, `/leads?${params}&with=contacts`);
+  const leads = (data._embedded?.leads || []).map((l: any) => {
+    const mainContact = l._embedded?.contacts?.find((c: any) => c.is_main) || l._embedded?.contacts?.[0];
+    return {
+      id: l.id,
+      name: l.name || `Lead #${l.id}`,
+      stage: statuses[l.status_id] || "Desconhecido",
+      price: l.price || 0,
+      created_at: l.created_at,
+      contact_id: mainContact?.id || null,
+    };
+  });
 
   return NextResponse.json({ leads });
 }

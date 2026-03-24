@@ -167,9 +167,9 @@ export default function Dashboard() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [chartView, setChartView] = useState<"30dias" | "hoje">("30dias");
   const [leadSearch, setLeadSearch] = useState("");
-  const [leadsList, setLeadsList] = useState<{id:number;name:string;stage:string;price:number}[]>([]);
+  const [leadsList, setLeadsList] = useState<{id:number;name:string;stage:string;price:number;contact_id:number|null}[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<{id:number;name:string;stage:string} | null>(null);
+  const [selectedLead, setSelectedLead] = useState<{id:number;name:string;stage:string;contact_id:number|null} | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [analysisError, setAnalysisError] = useState("");
@@ -199,7 +199,7 @@ export default function Dashboard() {
       const acc = accounts[activeAcc];
       const res = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subdomain: acc.subdomain, token: acc.token, lead_id: selectedLead.id }),
+        body: JSON.stringify({ subdomain: acc.subdomain, token: acc.token, lead_id: selectedLead.id, contact_id: selectedLead.contact_id }),
       });
       const json = await res.json();
       if (json.error) setAnalysisError(json.error);
@@ -738,10 +738,22 @@ export default function Dashboard() {
                 {analysisResult && (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <StatCard label="Lead analisado" value={`#${analysisResult.lead_id}`} sub={`${analysisResult.notes_count} notas`} accent="cyan" />
+                      <StatCard
+                        label="Lead analisado"
+                        value={`#${analysisResult.lead_id}`}
+                        sub={`${analysisResult.notes_count} mensagens · fonte: ${analysisResult.source === "whatsapp" ? "WhatsApp" : "Notas CRM"}`}
+                        accent="cyan"
+                        icon={analysisResult.source === "whatsapp" ? "💬" : "📝"}
+                      />
                       <StatCard label="Interesse" value={analysisResult.analysis?.interesse || "-"} accent={analysisResult.analysis?.interesse === "alto" ? "green" : analysisResult.analysis?.interesse === "médio" ? "yellow" : "red"} />
                       <StatCard label="Sentimento" value={analysisResult.analysis?.sentimento || "-"} accent={analysisResult.analysis?.sentimento === "positivo" ? "green" : analysisResult.analysis?.sentimento === "negativo" ? "red" : "yellow"} />
                     </div>
+                    {analysisResult.source === "whatsapp" && (
+                      <div className="flex items-center gap-2 rounded-lg bg-emerald-500/8 border border-emerald-500/20 px-4 py-2">
+                        <span className="text-emerald-400 text-sm">💬</span>
+                        <p className="text-xs text-emerald-400 font-medium">Análise baseada na conversa real do WhatsApp</p>
+                      </div>
+                    )}
                     <div className="rounded-xl border border-border bg-card p-5"><p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Resumo</p><p className="text-sm leading-relaxed">{analysisResult.analysis?.resumo}</p></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-5">

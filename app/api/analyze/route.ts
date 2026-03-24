@@ -19,38 +19,110 @@ async function fetchNotes(subdomain: string, token: string, leadId: number) {
   return pages;
 }
 
+async function fetchContactPhone(subdomain: string, token: string, contactId: number): Promise<string | null> {
+  try {
+    const res = await axios.get(
+      `https://${subdomain}.kommo.com/api/v4/contacts/${contactId}`,
+      { headers: { Authorization: `Bearer ${token}` }, validateStatus: (s) => s < 500, timeout: 8000 }
+    );
+    const fields: any[] = res.data?.custom_fields_values || [];
+    const phoneField = fields.find((f: any) => f.field_code === "PHONE");
+    const phone = phoneField?.values?.[0]?.value;
+    return phone || null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWhatsappHistory(phone: string): Promise<{ messages: { role: string; content: string }[]; count: number }> {
+  const supabaseUrl = process.env.N8N_SUPABASE_URL;
+  const supabaseKey = process.env.N8N_SUPABASE_KEY;
+  if (!supabaseUrl || !supabaseKey) return { messages: [], count: 0 };
+
+  // Normaliza: remove +, espaços, traços
+  const digits = phone.replace(/\D/g, "");
+
+  try {
+    const res = await axios.get(
+      `${supabaseUrl}/rest/v1/n8n_chat_histories?session_id=like.*${digits}*&order=id.asc&limit=200`,
+      {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        validateStatus: (s) => s < 500,
+        timeout: 8000,
+      }
+    );
+    const rows: any[] = res.data || [];
+    const messages = rows
+      .map((r: any) => {
+        const msg = r.message;
+        if (!msg?.content || !msg?.type) return null;
+        // Remove JSON interno que o n8n adiciona no final das mensagens da IA
+        const content = String(msg.content).replace(/\{[\s\S]*"proxima_etapa"[\s\S]*\}/g, "").trim();
+        if (!content) return null;
+        return { role: msg.type === "human" ? "Paciente" : "IA/Atendente", content };
+      })
+      .filter(Boolean) as { role: string; content: string }[];
+    return { messages, count: messages.length };
+  } catch {
+    return { messages: [], count: 0 };
+  }
+}
+
 export async function POST(req: NextRequest) {
   const auth = req.cookies.get("auth");
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { subdomain, token, lead_id } = await req.json();
+  const { subdomain, token, lead_id, contact_id } = await req.json();
   if (!subdomain || !token || !lead_id) {
     return NextResponse.json({ error: "Faltam campos obrigatórios" }, { status: 400 });
   }
 
   const clean = subdomain.replace(/^https?:\/\//, "").replace(/\.kommo\.com.*$/, "").trim();
 
-  const notes = await fetchNotes(clean, token, lead_id);
+  let source: "whatsapp" | "notas" = "notas";
+  let historyText = "";
+  let messageCount = 0;
 
-  if (!notes.length) {
-    return NextResponse.json({ error: "Nenhuma nota encontrada neste lead" }, { status: 404 });
+  // Tenta buscar conversa WhatsApp pelo telefone do contato
+  if (contact_id) {
+    const phone = await fetchContactPhone(clean, token, contact_id);
+    if (phone) {
+      const { messages, count } = await fetchWhatsappHistory(phone);
+      if (count > 0) {
+        source = "whatsapp";
+        messageCount = count;
+        historyText = messages
+          .map((m) => `${m.role}: ${m.content}`)
+          .join("\n");
+      }
+    }
   }
 
-  // Monta o histórico formatado
-  const history = notes
-    .map((n: any) => {
-      const text = n.params?.text || n.params?.value || "";
-      if (!text.trim()) return null;
-      const type = n.note_type;
-      const role =
-        type === 10 ? "Paciente" :
-        type === 12 ? "Atendente" :
-        type === 4  ? "Sistema/IA" : "Sistema";
-      const date = new Date(n.created_at * 1000).toLocaleString("pt-BR");
-      return `[${date}] ${role}: ${text}`;
-    })
-    .filter(Boolean)
-    .join("\n");
+  // Fallback: notas do Kommo
+  if (source === "notas") {
+    const notes = await fetchNotes(clean, token, lead_id);
+    if (!notes.length) {
+      return NextResponse.json({ error: "Nenhuma conversa ou nota encontrada neste lead" }, { status: 404 });
+    }
+    messageCount = notes.length;
+    historyText = notes
+      .map((n: any) => {
+        const text = n.params?.text || n.params?.value || "";
+        if (!text.trim()) return null;
+        const type = n.note_type;
+        const role =
+          type === 10 ? "Paciente" :
+          type === 12 ? "Atendente" :
+          type === 4  ? "Sistema/IA" : "Sistema";
+        const date = new Date(n.created_at * 1000).toLocaleString("pt-BR");
+        return `[${date}] ${role}: ${text}`;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
 
   // Chama GPT-4o mini
   const openaiRes = await axios.post(
@@ -73,7 +145,7 @@ Responda APENAS com o JSON, sem markdown.`,
         },
         {
           role: "user",
-          content: `Histórico do lead #${lead_id}:\n\n${history.slice(0, 8000)}`,
+          content: `Histórico do lead #${lead_id} (fonte: ${source === "whatsapp" ? "conversa WhatsApp" : "notas do CRM"}):\n\n${historyText.slice(0, 10000)}`,
         },
       ],
     },
@@ -97,7 +169,8 @@ Responda APENAS com o JSON, sem markdown.`,
 
   return NextResponse.json({
     lead_id,
-    notes_count: notes.length,
+    notes_count: messageCount,
+    source,
     analysis,
   });
 }
