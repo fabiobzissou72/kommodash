@@ -201,7 +201,8 @@ export default function Dashboard() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subdomain: acc.subdomain, token: acc.token, lead_id: selectedLead.id, contact_id: selectedLead.contact_id }),
       });
-      const json = await res.json();
+      let json: any;
+      try { json = await res.json(); } catch { setAnalysisError("Timeout: a análise demorou demais. Tente novamente."); return; }
       if (json.error) setAnalysisError(json.error);
       else setAnalysisResult(json);
     } catch (e: any) { setAnalysisError("Erro: " + (e?.message || "conexão falhou")); } finally { setAnalyzing(false); }

@@ -88,24 +88,24 @@ export async function POST(req: NextRequest) {
   let historyText = "";
   let messageCount = 0;
 
-  // Tenta buscar conversa WhatsApp pelo telefone do contato
-  if (contact_id) {
-    const phone = await fetchContactPhone(clean, token, contact_id);
-    if (phone) {
-      const { messages, count } = await fetchWhatsappHistory(phone);
-      if (count > 0) {
-        source = "whatsapp";
-        messageCount = count;
-        historyText = messages
-          .map((m) => `${m.role}: ${m.content}`)
-          .join("\n");
-      }
+  // Paraleliza: busca telefone + notas ao mesmo tempo
+  const [phone, notes] = await Promise.all([
+    contact_id ? fetchContactPhone(clean, token, contact_id) : Promise.resolve(null),
+    fetchNotes(clean, token, lead_id),
+  ]);
+
+  // Tenta WhatsApp primeiro
+  if (phone) {
+    const { messages, count } = await fetchWhatsappHistory(phone);
+    if (count > 0) {
+      source = "whatsapp";
+      messageCount = count;
+      historyText = messages.map((m) => `${m.role}: ${m.content}`).join("\n");
     }
   }
 
   // Fallback: notas do Kommo
   if (source === "notas") {
-    const notes = await fetchNotes(clean, token, lead_id);
     if (!notes.length) {
       return NextResponse.json({ error: "Nenhuma conversa ou nota encontrada neste lead" }, { status: 404 });
     }
@@ -154,6 +154,7 @@ Responda APENAS com o JSON, sem markdown.`,
     {
       headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       validateStatus: (s) => s < 600,
+      timeout: 20000,
     }
   );
 
