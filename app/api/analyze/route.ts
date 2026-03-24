@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
     {
       model: "gpt-4o-mini",
       temperature: 0.3,
+      max_tokens: 600,
       messages: [
         {
           role: "system",
@@ -147,7 +148,7 @@ Responda APENAS com o JSON, sem markdown.`,
         },
         {
           role: "user",
-          content: `Histórico do lead #${lead_id} (fonte: ${source === "whatsapp" ? "conversa WhatsApp" : "notas do CRM"}):\n\n${historyText.slice(0, 10000)}`,
+          content: `Histórico do lead #${lead_id} (fonte: ${source === "whatsapp" ? "conversa WhatsApp" : "notas do CRM"}):\n\n${historyText.slice(0, 6000)}`,
         },
       ],
     },
