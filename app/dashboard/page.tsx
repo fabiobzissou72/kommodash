@@ -204,7 +204,7 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.error) setAnalysisError(json.error);
       else setAnalysisResult(json);
-    } catch { setAnalysisError("Erro de conexão"); } finally { setAnalyzing(false); }
+    } catch (e: any) { setAnalysisError("Erro: " + (e?.message || "conexão falhou")); } finally { setAnalyzing(false); }
   }
 
   useEffect(() => {

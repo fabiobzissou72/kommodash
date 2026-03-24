@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 
+export const maxDuration = 60;
+
 async function fetchNotes(subdomain: string, token: string, leadId: number) {
   const pages = [];
   for (let page = 1; page <= 4; page++) {
