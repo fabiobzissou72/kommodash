@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import axios from "axios";
 
+export const runtime = "edge";
 export const maxDuration = 60;
 
 async function fetchNotes(subdomain: string, token: string, leadId: number) {
-  const pages = [];
-  for (let page = 1; page <= 4; page++) {
+  const pages: any[] = [];
+  for (let page = 1; page <= 3; page++) {
     try {
-      const res = await axios.get(
+      const res = await fetch(
         `https://${subdomain}.kommo.com/api/v4/leads/${leadId}/notes?limit=250&page=${page}`,
-        { headers: { Authorization: `Bearer ${token}` }, validateStatus: (s) => s < 500 }
+        { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) }
       );
-      const notes = res.data?._embedded?.notes || [];
+      if (!res.ok) break;
+      const data = await res.json();
+      const notes = data?._embedded?.notes || [];
       pages.push(...notes);
       if (notes.length < 250) break;
     } catch {
@@ -23,14 +25,15 @@ async function fetchNotes(subdomain: string, token: string, leadId: number) {
 
 async function fetchContactPhone(subdomain: string, token: string, contactId: number): Promise<string | null> {
   try {
-    const res = await axios.get(
+    const res = await fetch(
       `https://${subdomain}.kommo.com/api/v4/contacts/${contactId}`,
-      { headers: { Authorization: `Bearer ${token}` }, validateStatus: (s) => s < 500, timeout: 8000 }
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) }
     );
-    const fields: any[] = res.data?.custom_fields_values || [];
+    if (!res.ok) return null;
+    const data = await res.json();
+    const fields: any[] = data?.custom_fields_values || [];
     const phoneField = fields.find((f: any) => f.field_code === "PHONE");
-    const phone = phoneField?.values?.[0]?.value;
-    return phone || null;
+    return phoneField?.values?.[0]?.value || null;
   } catch {
     return null;
   }
@@ -41,27 +44,21 @@ async function fetchWhatsappHistory(phone: string): Promise<{ messages: { role: 
   const supabaseKey = process.env.N8N_SUPABASE_KEY;
   if (!supabaseUrl || !supabaseKey) return { messages: [], count: 0 };
 
-  // Normaliza: remove +, espaços, traços
   const digits = phone.replace(/\D/g, "");
-
   try {
-    const res = await axios.get(
-      `${supabaseUrl}/rest/v1/n8n_chat_histories?session_id=like.*${digits}*&order=id.asc&limit=200`,
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/n8n_chat_histories?session_id=like.*${digits}*&order=id.asc&limit=100`,
       {
-        headers: {
-          apikey: supabaseKey,
-          Authorization: `Bearer ${supabaseKey}`,
-        },
-        validateStatus: (s) => s < 500,
-        timeout: 8000,
+        headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+        signal: AbortSignal.timeout(6000),
       }
     );
-    const rows: any[] = res.data || [];
+    if (!res.ok) return { messages: [], count: 0 };
+    const rows: any[] = await res.json();
     const messages = rows
       .map((r: any) => {
         const msg = r.message;
         if (!msg?.content || !msg?.type) return null;
-        // Remove JSON interno que o n8n adiciona no final das mensagens da IA
         const content = String(msg.content).replace(/\{[\s\S]*"proxima_etapa"[\s\S]*\}/g, "").trim();
         if (!content) return null;
         return { role: msg.type === "human" ? "Paciente" : "IA/Atendente", content };
@@ -127,10 +124,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Chama GPT-4o mini
-  const openaiRes = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: "gpt-4o-mini",
+  const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
       temperature: 0.3,
       max_tokens: 600,
       messages: [
@@ -151,30 +152,24 @@ Responda APENAS com o JSON, sem markdown.`,
           content: `Histórico do lead #${lead_id} (fonte: ${source === "whatsapp" ? "conversa WhatsApp" : "notas do CRM"}):\n\n${historyText.slice(0, 6000)}`,
         },
       ],
-    },
-    {
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      validateStatus: (s) => s < 600,
-      timeout: 20000,
-    }
-  );
+    }),
+    signal: AbortSignal.timeout(25000),
+  });
 
-  if (openaiRes.status !== 200) {
-    return NextResponse.json({ error: "Erro ao chamar OpenAI: " + openaiRes.data?.error?.message }, { status: 500 });
+  if (!openaiRes.ok) {
+    const err = await openaiRes.json().catch(() => ({}));
+    return NextResponse.json({ error: "Erro ao chamar OpenAI: " + (err?.error?.message || openaiRes.status) }, { status: 500 });
   }
+
+  const openaiData = await openaiRes.json();
 
   let analysis;
   try {
-    const content = openaiRes.data.choices[0].message.content;
+    const content = openaiData.choices[0].message.content;
     analysis = JSON.parse(content);
   } catch {
-    analysis = { resumo: openaiRes.data.choices[0].message.content };
+    analysis = { resumo: openaiData.choices[0].message.content };
   }
 
-  return NextResponse.json({
-    lead_id,
-    notes_count: messageCount,
-    source,
-    analysis,
-  });
+  return NextResponse.json({ lead_id, notes_count: messageCount, source, analysis });
 }
