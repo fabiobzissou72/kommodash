@@ -779,6 +779,35 @@ export default function Dashboard() {
                       <p className="text-xs text-cyan-400 mb-3 font-semibold uppercase tracking-wider">Próximo passo</p>
                       <p className="text-sm leading-relaxed">{analysisResult.analysis?.proximo_passo}</p>
                     </div>
+                    {analysisResult.analysis?.abordagem_fechamento && (
+                      <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5 space-y-4">
+                        <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">🎯 Abordagem de Fechamento</p>
+                        {analysisResult.analysis.abordagem_fechamento.script && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-2 font-medium">Script sugerido</p>
+                            <div className="bg-background/60 rounded-lg border border-emerald-500/20 px-4 py-3">
+                              <p className="text-sm leading-relaxed italic">"{analysisResult.analysis.abordagem_fechamento.script}"</p>
+                            </div>
+                          </div>
+                        )}
+                        {analysisResult.analysis.abordagem_fechamento.gatilhos?.length > 0 && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-2 font-medium">Gatilhos a usar</p>
+                            <div className="flex flex-wrap gap-2">
+                              {analysisResult.analysis.abordagem_fechamento.gatilhos.map((g: string, i: number) => (
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">{g}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {analysisResult.analysis.abordagem_fechamento.alerta && (
+                          <div className="flex gap-2 items-start rounded-lg bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
+                            <span className="text-amber-400 text-sm shrink-0">⚠</span>
+                            <p className="text-xs text-amber-300 leading-relaxed">{analysisResult.analysis.abordagem_fechamento.alerta}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

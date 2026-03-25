@@ -115,18 +115,19 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         temperature: 0.3,
-        max_tokens: 600,
+        max_tokens: 900,
         messages: [
           {
             role: "system",
-            content: `Você é um analista de vendas especializado em nutrição/saúde.
+            content: `Você é um consultor de vendas especializado em nutrição/saúde.
 Analise o histórico de conversa de um lead e retorne um JSON com:
 - resumo: resumo em 2-3 linhas do que foi discutido
 - objecoes: lista das principais objeções/resistências do paciente (max 5)
 - duvidas: lista das principais dúvidas do paciente (max 5)
 - interesse: nivel de interesse (baixo | médio | alto)
 - sentimento: sentimento geral (positivo | neutro | negativo)
-- proximo_passo: sugestão do próximo passo para o atendente
+- proximo_passo: sugestão do próximo passo imediato para o atendente
+- abordagem_fechamento: objeto com { script: string (mensagem ou roteiro sugerido para o atendente usar agora para avançar o fechamento, personalizado para este lead), gatilhos: string[] (até 3 gatilhos mentais ou argumentos de venda relevantes para este caso, ex: "prova social", "urgência", "transformação"), alerta: string (um risco ou armadilha a evitar com este lead específico) }
 Responda APENAS com o JSON, sem markdown.`,
           },
           {
