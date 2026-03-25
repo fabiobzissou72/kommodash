@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
   const res = NextResponse.json({ ok: true, name: user.name, role: user.role });
   res.cookies.set("auth", user.id, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false",
+    sameSite: "lax",
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
   });
@@ -86,8 +86,8 @@ export async function DELETE() {
   const res = NextResponse.json({ ok: true });
   res.cookies.set("auth", "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false",
+    sameSite: "lax",
     maxAge: 0,
     path: "/",
   });

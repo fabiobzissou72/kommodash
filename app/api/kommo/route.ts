@@ -137,37 +137,20 @@ export async function POST(req: NextRequest) {
 
     await delay(150);
 
-    // === LOTE 2: Período atual (sequencial para evitar rate limit) ===
-    const todayRes = await kommoFetch(subdomain, safeToken,
-      `/leads?filter[created_at][from]=${todayTs}&filter[created_at][to]=${ts}&limit=250`);
-    await delay(150);
-
-    const weekRes = await kommoFetch(subdomain, safeToken,
-      `/leads?filter[created_at][from]=${weekTs}&filter[created_at][to]=${ts}&limit=250`);
-    await delay(150);
-
-    const monthRes = await kommoFetch(subdomain, safeToken,
-      `/leads?filter[created_at][from]=${monthTs}&filter[created_at][to]=${ts}&limit=250`);
-    await delay(150);
-
-    const wonTodayRes = await kommoFetch(subdomain, safeToken,
-      `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142&limit=250`);
-    await delay(150);
-
-    const lostTodayRes = await kommoFetch(subdomain, safeToken,
-      `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143&limit=250`);
-    await delay(150);
-
-    const wonAllData = await kommoFetchLeads(subdomain, safeToken,
-      `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142`);
-    await delay(150);
-
-    const { count: lostCountPaginated } = await kommoFetchLeads(subdomain, safeToken,
-      `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143`);
-    await delay(150);
-
-    const tasksRes = await kommoFetch(subdomain, safeToken,
-      `/tasks?filter[is_completed]=0&filter[till][to]=${ts}&limit=250`).catch(() => ({}));
+    // === LOTE 2: Período atual (paralelo) ===
+    const [
+      todayRes, weekRes, monthRes, wonTodayRes, lostTodayRes, wonAllData, lostAllData, tasksRes,
+    ] = await Promise.all([
+      kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${todayTs}&filter[created_at][to]=${ts}&limit=250`),
+      kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${weekTs}&filter[created_at][to]=${ts}&limit=250`),
+      kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${monthTs}&filter[created_at][to]=${ts}&limit=250`),
+      kommoFetch(subdomain, safeToken, `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142&limit=250`),
+      kommoFetch(subdomain, safeToken, `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143&limit=250`),
+      kommoFetchLeads(subdomain, safeToken, `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142`),
+      kommoFetchLeads(subdomain, safeToken, `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143`),
+      kommoFetch(subdomain, safeToken, `/tasks?filter[is_completed]=0&filter[till][to]=${ts}&limit=250`).catch(() => ({})),
+    ]);
+    const lostCountPaginated = lostAllData.count;
     await delay(200);
 
     // === LOTE 2b: Ontem + Contatos + Atividade + Tarefas completas ===
@@ -370,22 +353,27 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
 
-    // === LOTE 4: Histórico 30 dias ===
+    // === LOTE 4: Histórico 30 dias (uma query só) ===
+    const thirtyDaysAgo = startOfDay(29);
+    const recentLeadsData = await kommoFetchLeads(subdomain, safeToken,
+      `/leads?filter[created_at][from]=${thirtyDaysAgo}&filter[created_at][to]=${ts}`).catch(() => ({ count: 0, value: 0, leads: [] }));
+
+    const dailyMap: Record<string, number> = {};
     const daily: { date: string; count: number }[] = [];
     for (let i = 29; i >= 0; i--) {
-      const from  = startOfDay(i);
-      const to    = i === 0 ? ts : startOfDay(i - 1);
-      const label = new Date(from * 1000).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-      try {
-        const d = await kommoFetch(subdomain, safeToken,
-          `/leads?filter[created_at][from]=${from}&filter[created_at][to]=${to}&limit=250`);
-        const leads: unknown[] = d._embedded?.leads || [];
-        daily.push({ date: label, count: leads.length });
-      } catch {
-        daily.push({ date: label, count: 0 });
-      }
-      await delay(150);
+      const from = startOfDay(i);
+      const d = new Date(from * 1000);
+      const label = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+      dailyMap[label] = 0;
+      daily.push({ date: label, count: 0 });
     }
+    recentLeadsData.leads.forEach((l: LeadRaw) => {
+      if (!l.created_at) return;
+      const d = new Date(l.created_at * 1000);
+      const label = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (label in dailyMap) dailyMap[label]++;
+    });
+    daily.forEach(d => { d.count = dailyMap[d.date]; });
 
     const bugIaStage = funnel.find(f => f.name.toLowerCase().includes("bug"));
     const bug_ia = bugIaStage?.count || 0;
