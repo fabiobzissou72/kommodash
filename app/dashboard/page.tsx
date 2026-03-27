@@ -1198,7 +1198,7 @@ export default function Dashboard() {
                             <Line type="monotone" dataKey="value" stroke="#00e5a0" strokeWidth={2.5} dot={{ fill: "#00e5a0", r: 4 }} activeDot={{ r: 6 }} name="Faturamento" />
                           </LineChart>
                         </ResponsiveContainer>
-                        <p className="text-xs text-muted-foreground mt-2">Receita de pacientes ganhos (status 142) por mês de fechamento</p>
+                        <p className="text-xs text-muted-foreground mt-2">Receita de pacientes que entraram no plano por mês (FUNIL PACIENTES ATIVOS)</p>
                       </PanelCard>
                     </div>
 

@@ -445,29 +445,7 @@ export async function POST(req: NextRequest) {
       await delay(150);
     }
 
-    // Faturamento histórico — usa wonAllLeads (pipeline principal) agrupado por mês de fechamento
-    {
-      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-      const today = new Date();
-      const monthMap: Record<string, number> = {};
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        monthMap[`${d.getFullYear()}-${d.getMonth()}`] = 0;
-      }
-      for (const lead of wonAllLeads) {
-        if (!lead.closed_at) continue;
-        const d = new Date(lead.closed_at * 1000);
-        const key = `${d.getFullYear()}-${d.getMonth()}`;
-        if (key in monthMap) monthMap[key] += lead.price || 0;
-      }
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${d.getMonth()}`;
-        faturamento_historico.push({ month: `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, value: monthMap[key] || 0 });
-      }
-    }
-
-    // === LOTE 6: Renovações — Funil Pacientes Ativos ===
+    // === LOTE 6: Renovações + Faturamento histórico — Funil Pacientes Ativos ===
     let renov_ate_30 = 0;
     let renov_30_60 = 0;
     let renov_60_90 = 0;
@@ -495,6 +473,33 @@ export async function POST(req: NextRequest) {
         else if (fimTs <= d60)  renov_30_60++;
         else if (fimTs <= d90)  renov_60_90++;
         else if (fimTs <= d365) renov_90_365++;
+      }
+
+      // Faturamento histórico — agrupa pacientes ativos por mês de criação (created_at = entrada no plano)
+      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const todayD = new Date();
+      const monthMap: Record<string, number> = {};
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(todayD.getFullYear(), todayD.getMonth() - i, 1);
+        monthMap[`${d.getFullYear()}-${d.getMonth()}`] = 0;
+      }
+      for (const lead of pacRenovData.leads) {
+        if (!lead.created_at) continue;
+        const d = new Date(lead.created_at * 1000);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        if (key in monthMap) monthMap[key] += lead.price || 0;
+      }
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(todayD.getFullYear(), todayD.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        faturamento_historico.push({ month: `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, value: monthMap[key] || 0 });
+      }
+    } else {
+      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const todayD = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(todayD.getFullYear(), todayD.getMonth() - i, 1);
+        faturamento_historico.push({ month: `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, value: 0 });
       }
     }
 
