@@ -391,6 +391,126 @@ export async function POST(req: NextRequest) {
       .filter(l => l.closed_at && l.closed_at >= monthTs)
       .reduce((s, l) => s + (l.price || 0), 0);
 
+    // === LOTE 5: Funil Follow Up ===
+    const followUpPipeline = pipelines.find(p => p.name.toLowerCase().includes("follow up"));
+    const followUpStatuses: { id: number; name: string }[] = (followUpPipeline?._embedded?.statuses || [])
+      .filter((s: { id: number }) => s.id !== 142 && s.id !== 143);
+
+    const fupEtapas = followUpStatuses.filter(s => /fup\s*\d/i.test(s.name));
+
+    let fup_por_etapa: { name: string; count: number }[] = [];
+    let fup_ativos = 0;
+
+    if (followUpPipeline && fupEtapas.length > 0) {
+      const fupResults = await Promise.all(
+        fupEtapas.map(s =>
+          kommoFetch(subdomain, safeToken,
+            `/leads?filter[statuses][0][pipeline_id]=${followUpPipeline.id}&filter[statuses][0][status_id]=${s.id}&limit=250`
+          ).catch(() => ({}))
+        )
+      );
+      await delay(200);
+      fup_por_etapa = fupEtapas.map((s, i) => ({
+        name: s.name,
+        count: (fupResults[i] as any)?._embedded?.leads?.length || 0,
+      }));
+      fup_ativos = fup_por_etapa.reduce((sum, e) => sum + e.count, 0);
+    }
+
+    // fup_expirados = leads na etapa "nutrição" do funil principal
+    const nutricaoStage = funnel.find(f => f.name.toLowerCase().includes("nutri"));
+    const fup_expirados = nutricaoStage?.count || 0;
+    const fup_total = fup_ativos + fup_expirados;
+
+    // fup_conversoes = leads "Venda ganha" dentro do FUNIL FOLLOW UP
+    let fup_conversoes = 0;
+    if (followUpPipeline) {
+      const fupGanhoRes = await kommoFetch(subdomain, safeToken,
+        `/leads?filter[statuses][0][pipeline_id]=${followUpPipeline.id}&filter[statuses][0][status_id]=142&limit=250`
+      ).catch(() => ({}));
+      fup_conversoes = (fupGanhoRes as any)?._embedded?.leads?.length || 0;
+    }
+    await delay(150);
+
+    // === LOTE 7: Churn + Faturamento histórico (últimos 6 meses) ===
+    let churn = 0;
+    const faturamento_historico: { month: string; value: number }[] = [];
+
+    if (pacientesPipeline) {
+      // Churn = perdidos no pacientes no último mês
+      const churnRes = await kommoFetch(subdomain, safeToken,
+        `/leads?filter[statuses][0][pipeline_id]=${pacientesPipeline.id}&filter[statuses][0][status_id]=143&filter[closed_at][from]=${monthTs}&filter[closed_at][to]=${ts}&limit=250`
+      ).catch(() => ({}));
+      churn = (churnRes as any)?._embedded?.leads?.length || 0;
+      await delay(150);
+
+      // Faturamento histórico — busca ganhos dos últimos 6 meses
+      const sixMonthsAgo = startOfDay(180);
+      const fatData = await kommoFetchLeads(subdomain, safeToken,
+        `/leads?filter[statuses][0][pipeline_id]=${pacientesPipeline.id}&filter[statuses][0][status_id]=142&filter[closed_at][from]=${sixMonthsAgo}&filter[closed_at][to]=${ts}`, 10
+      ).catch(() => ({ count: 0, value: 0, leads: [] }));
+
+      // Agrupar por mês (últimos 6 meses)
+      const monthMap: Record<string, number> = {};
+      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const today = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        monthMap[key] = 0;
+      }
+      for (const lead of fatData.leads) {
+        if (!lead.closed_at) continue;
+        const d = new Date(lead.closed_at * 1000);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        if (key in monthMap) monthMap[key] += lead.price || 0;
+      }
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        faturamento_historico.push({ month: `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, value: monthMap[key] || 0 });
+      }
+    } else {
+      // Sem pacientes pipeline: gerar 6 meses zerados para o gráfico não quebrar
+      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const today = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        faturamento_historico.push({ month: `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, value: 0 });
+      }
+    }
+
+    // === LOTE 6: Renovações — Funil Pacientes Ativos ===
+    let renov_ate_30 = 0;
+    let renov_30_60 = 0;
+    let renov_60_90 = 0;
+    let renov_90_365 = 0;
+
+    if (pacientesPipeline) {
+      const nowTs = now();
+      const d30  = nowTs + 30 * 86400;
+      const d60  = nowTs + 60 * 86400;
+      const d90  = nowTs + 90 * 86400;
+      const d365 = nowTs + 365 * 86400;
+
+      const pacRenovData = await kommoFetchLeads(subdomain, safeToken,
+        `/leads?filter[pipeline_id]=${pacientesPipeline.id}&with=custom_fields`, 20
+      ).catch(() => ({ count: 0, value: 0, leads: [] }));
+
+      for (const lead of pacRenovData.leads) {
+        const fields: { field_id: number; values: { value: number }[] }[] =
+          (lead as any).custom_fields_values || [];
+        const fimField = fields.find(f => f.field_id === 2040527);
+        if (!fimField || !fimField.values?.length) continue;
+        const fimTs = Number(fimField.values[0].value);
+        if (!fimTs || fimTs <= nowTs) continue;
+        if (fimTs <= d30)       renov_ate_30++;
+        else if (fimTs <= d60)  renov_30_60++;
+        else if (fimTs <= d90)  renov_60_90++;
+        else if (fimTs <= d365) renov_90_365++;
+      }
+    }
+
     const result = {
       pipeline: { id: pid, name: pipeline?.name || "" },
       pipelines: pipelines.map(p => ({ id: p.id, name: p.name })),
@@ -433,6 +553,17 @@ export async function POST(req: NextRequest) {
       active_by_user: activeByUser,
       pacientes,
       bug_ia,
+      fup_ativos,
+      fup_expirados,
+      fup_total,
+      fup_por_etapa,
+      fup_conversoes,
+      renov_ate_30,
+      renov_30_60,
+      renov_60_90,
+      renov_90_365,
+      churn,
+      faturamento_historico,
     };
 
     // Snapshot Supabase
