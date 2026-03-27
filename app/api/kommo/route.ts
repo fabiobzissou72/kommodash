@@ -443,23 +443,18 @@ export async function POST(req: NextRequest) {
       ).catch(() => ({}));
       churn = (churnRes as any)?._embedded?.leads?.length || 0;
       await delay(150);
+    }
 
-      // Faturamento histórico — busca ganhos dos últimos 6 meses
-      const sixMonthsAgo = startOfDay(180);
-      const fatData = await kommoFetchLeads(subdomain, safeToken,
-        `/leads?filter[statuses][0][pipeline_id]=${pacientesPipeline.id}&filter[statuses][0][status_id]=142&filter[closed_at][from]=${sixMonthsAgo}&filter[closed_at][to]=${ts}`, 10
-      ).catch(() => ({ count: 0, value: 0, leads: [] }));
-
-      // Agrupar por mês (últimos 6 meses)
-      const monthMap: Record<string, number> = {};
+    // Faturamento histórico — usa wonAllLeads (pipeline principal) agrupado por mês de fechamento
+    {
       const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
       const today = new Date();
+      const monthMap: Record<string, number> = {};
       for (let i = 5; i >= 0; i--) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${d.getMonth()}`;
-        monthMap[key] = 0;
+        monthMap[`${d.getFullYear()}-${d.getMonth()}`] = 0;
       }
-      for (const lead of fatData.leads) {
+      for (const lead of wonAllLeads) {
         if (!lead.closed_at) continue;
         const d = new Date(lead.closed_at * 1000);
         const key = `${d.getFullYear()}-${d.getMonth()}`;
@@ -469,14 +464,6 @@ export async function POST(req: NextRequest) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const key = `${d.getFullYear()}-${d.getMonth()}`;
         faturamento_historico.push({ month: `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, value: monthMap[key] || 0 });
-      }
-    } else {
-      // Sem pacientes pipeline: gerar 6 meses zerados para o gráfico não quebrar
-      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-      const today = new Date();
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        faturamento_historico.push({ month: `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, value: 0 });
       }
     }
 
