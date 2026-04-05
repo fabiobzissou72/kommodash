@@ -77,9 +77,10 @@ export async function GET(req: NextRequest) {
 
     const todayStr = startOfDay(0);
     const weekStr = startOfWeek();
-    const monthStr = dateFrom ? `${dateFrom}T00:00:00.000Z` : startOfMonth();
-    const monthEnd = dateTo ? `${dateTo}T23:59:59.999Z` : new Date().toISOString();
-    const thirtyDaysAgo = startOfDay(30);
+    const hasFilter = !!(dateFrom || dateTo);
+    const periodStart = dateFrom ? `${dateFrom}T00:00:00.000Z` : startOfMonth();
+    const periodEnd = dateTo ? `${dateTo}T23:59:59.999Z` : new Date().toISOString();
+    const chartStart = dateFrom ? `${dateFrom}T00:00:00.000Z` : startOfDay(30);
 
     // Supabase queries em paralelo
     const [
@@ -95,10 +96,14 @@ export async function GET(req: NextRequest) {
       sb.from("dados_cliente").select("*", { count: "exact", head: true }),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", todayStr),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", weekStr),
-      sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", monthStr).lte("created_at", monthEnd),
-      sb.from("dados_cliente").select("created_at").gte("created_at", thirtyDaysAgo),
-      sb.from("nsf_conversations").select("phone, current_stage, created_at"),
-      sb.from("follow_up_tracking").select("status, follow_up_count"),
+      sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", periodStart).lte("created_at", periodEnd),
+      sb.from("dados_cliente").select("created_at").gte("created_at", chartStart).lte("created_at", periodEnd),
+      hasFilter
+        ? sb.from("nsf_conversations").select("phone, current_stage, created_at").gte("created_at", periodStart).lte("created_at", periodEnd)
+        : sb.from("nsf_conversations").select("phone, current_stage, created_at"),
+      hasFilter
+        ? sb.from("follow_up_tracking").select("status, follow_up_count").gte("created_at", periodStart).lte("created_at", periodEnd)
+        : sb.from("follow_up_tracking").select("status, follow_up_count"),
       sb.from("dados_cliente").select("telefone").eq("humano", true),
     ]);
 
@@ -177,11 +182,6 @@ export async function GET(req: NextRequest) {
       getAllRdDeals(PIPELINE_PACIENTES),
     ]);
 
-    // Follow-up (RD Station)
-    const fupAtivos = fupDeals.filter((d:any)=>d.deal_stage?.name?.startsWith("FUP")).length;
-    const fupExpirados = fupDeals.filter((d:any)=>d.deal_stage?.name==="NUTRIÇÃO").length;
-    const fupTotal = Math.max(fupDeals.length, fupTracking?.length || 0);
-
     // FUP stats da tabela follow_up_tracking
     const fupTrackingAll = fupTracking || [];
     const fupTrackingTotal = fupTrackingAll.length;
@@ -202,13 +202,29 @@ export async function GET(req: NextRequest) {
     });
     const fupStats = Object.entries(fupStatsMap).map(([fup,stats]) => ({ fup, ...stats }));
 
-    // Financeiro (RD Station pacientes ativos)
+    // Financeiro (RD Station pacientes ativos) — filtra por período se set
+    const pacientesFiltered = hasFilter
+      ? pacientesDeals.filter((d:any) => {
+          if (!d.created_at) return false;
+          const dc = d.created_at.slice(0, 10);
+          return (!dateFrom || dc >= dateFrom) && (!dateTo || dc <= dateTo);
+        })
+      : pacientesDeals;
+
+    const fupDealsFiltered = hasFilter
+      ? fupDeals.filter((d:any) => {
+          if (!d.created_at) return false;
+          const dc = d.created_at.slice(0, 10);
+          return (!dateFrom || dc >= dateFrom) && (!dateTo || dc <= dateTo);
+        })
+      : fupDeals;
+
     let finFaturamentoTotal = 0;
     let finTrimestralCount = 0, finSemestralCount = 0;
     let finTrimestralValor = 0, finSemestralValor = 0;
     const finFatHistMap: Record<string,number> = {};
 
-    pacientesDeals.forEach((d:any) => {
+    pacientesFiltered.forEach((d:any) => {
       const valor = d.amount_total || 0;
       finFaturamentoTotal += valor;
 
@@ -230,7 +246,7 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const totalPacientes = pacientesDeals.length;
+    const totalPacientes = pacientesFiltered.length;
     const finTicketMedio = totalPacientes > 0 ? Math.round(finFaturamentoTotal/totalPacientes) : 0;
     const finMrr = Math.round(finTrimestralValor/3 + finSemestralValor/6);
     const finLtvTrimestral = finTrimestralCount > 0 ? Math.round(finTrimestralValor/finTrimestralCount) : 497;
@@ -243,7 +259,13 @@ export async function GET(req: NextRequest) {
     });
 
     const taxaConversao = (totalLeads||0) > 0 ? Math.round((totalPacientes/(totalLeads||1))*100) : 0;
-    const vendasHoje = pacientesDeals.filter((d:any)=>d.created_at>=todayStr.slice(0,10)).length;
+    const vendasHoje = hasFilter
+      ? pacientesFiltered.length
+      : pacientesDeals.filter((d:any)=>d.created_at>=todayStr.slice(0,10)).length;
+
+    const fupAtivos = fupDealsFiltered.filter((d:any)=>d.deal_stage?.name?.startsWith("FUP")).length;
+    const fupExpirados = fupDealsFiltered.filter((d:any)=>d.deal_stage?.name==="NUTRIÇÃO").length;
+    const fupTotal = Math.max(fupDealsFiltered.length, fupTrackingTotal);
 
     return NextResponse.json({
       // Funil
