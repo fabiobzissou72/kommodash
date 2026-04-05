@@ -1,0 +1,282 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+export const dynamic = "force-dynamic";
+
+const RD_TOKEN = "69cacc672fdda900130b9074";
+const RD_BASE = "https://crm.rdstation.com/api/v1";
+const PIPELINE_FUP = "69cab6d0f9efe6001ae97e70";
+const PIPELINE_PACIENTES = "69cac118c640ee001964801b";
+
+function getSb() {
+  return createClient(process.env.N8N_SUPABASE_URL!, process.env.N8N_SUPABASE_KEY!);
+}
+
+async function rdFetch(path: string): Promise<any> {
+  try {
+    const sep = path.includes("?") ? "&" : "?";
+    const res = await fetch(`${RD_BASE}${path}${sep}token=${RD_TOKEN}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}
+
+async function getAllRdDeals(pipelineId: string): Promise<any[]> {
+  const deals: any[] = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore && page <= 20) {
+    const d = await rdFetch(`/deals?deal_pipeline_id=${pipelineId}&limit=200&page=${page}`);
+    if (!d || !Array.isArray(d.deals)) break;
+    deals.push(...d.deals);
+    hasMore = d.has_more || false;
+    page++;
+  }
+  return deals;
+}
+
+function startOfDay(daysAgo = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+function startOfWeek(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+function startOfMonth(): string {
+  const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+function dateKey(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function monthLabel(monthsAgo: number): { key: string; label: string } {
+  const d = new Date();
+  d.setMonth(d.getMonth() - monthsAgo);
+  return {
+    key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+    label: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+  };
+}
+
+export async function GET(req: NextRequest) {
+  const auth = req.cookies.get("auth");
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const url = new URL(req.url);
+  const dateFrom = url.searchParams.get("date_from") || "";
+  const dateTo = url.searchParams.get("date_to") || "";
+
+  try {
+    const sb = getSb();
+
+    const todayStr = startOfDay(0);
+    const weekStr = startOfWeek();
+    const monthStr = dateFrom ? `${dateFrom}T00:00:00.000Z` : startOfMonth();
+    const monthEnd = dateTo ? `${dateTo}T23:59:59.999Z` : new Date().toISOString();
+    const thirtyDaysAgo = startOfDay(30);
+
+    // Supabase queries em paralelo
+    const [
+      { count: totalLeads },
+      { count: leadsHoje },
+      { count: leadsSemana },
+      { count: leadsMes },
+      { data: leadsLast30 },
+      { data: convStages },
+      { data: fupTracking },
+    ] = await Promise.all([
+      sb.from("dados_cliente").select("*", { count: "exact", head: true }),
+      sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", todayStr),
+      sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", weekStr),
+      sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", monthStr).lte("created_at", monthEnd),
+      sb.from("dados_cliente").select("created_at").gte("created_at", thirtyDaysAgo),
+      sb.from("nsf_conversations").select("current_stage, created_at"),
+      sb.from("follow_up_tracking").select("status, follow_up_count"),
+    ]);
+
+    // Stage distribution
+    const stageMap: Record<number, number> = {};
+    (convStages || []).forEach((c: any) => {
+      const s = Number(c.current_stage) || 1;
+      stageMap[s] = (stageMap[s] || 0) + 1;
+    });
+
+    const totalConvs = convStages?.length || 0;
+
+    // Funil de atendimento
+    const funnelEtapas = [
+      { name: "Contato Inicial", count: stageMap[1] || 0 },
+      { name: "IA Respondeu", count: (stageMap[2]||0)+(stageMap[3]||0)+(stageMap[4]||0)+(stageMap[5]||0) },
+      { name: "IA Concluiu", count: stageMap[6] || 0 },
+      { name: "Humano", count: stageMap[99] || 0 },
+      { name: "Lead Quente", count: stageMap[100] || 0 },
+      { name: "Ag. Pagamento", count: stageMap[101] || 0 },
+      { name: "Respondido", count: stageMap[102] || 0 },
+    ];
+
+    // Leads por dia - últimos 30d
+    const dayCount: Record<string, number> = {};
+    (leadsLast30 || []).forEach((l: any) => {
+      if (l.created_at) {
+        const key = dateKey(l.created_at);
+        dayCount[key] = (dayCount[key] || 0) + 1;
+      }
+    });
+    const leadsPorDia: { date: string; count: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = dateKey(d.toISOString());
+      const label = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+      leadsPorDia.push({ date: label, count: dayCount[key] || 0 });
+    }
+
+    // IA metrics
+    const stageOrder = [1, 2, 3, 4, 5, 6, 99];
+    const stageNames: Record<number, string> = {
+      1: "Etapa 1", 2: "Etapa 2", 3: "Etapa 3",
+      4: "Etapa 4", 5: "Etapa 5", 6: "Etapa 6", 99: "Humano",
+    };
+
+    const iaAbandonoPorEtapa = stageOrder.map((stage, i) => {
+      const chegaram = (convStages || []).filter((c: any) => (Number(c.current_stage)||1) >= stage).length;
+      const prev = i > 0
+        ? (convStages || []).filter((c: any) => (Number(c.current_stage)||1) >= stageOrder[i-1]).length
+        : chegaram;
+      return { etapa: stageNames[stage], chegaram, abandonaram: Math.max(0, prev - chegaram) };
+    });
+
+    const reachedStage6 = (convStages||[]).filter((c:any)=>(Number(c.current_stage)||0)>=6).length;
+    const reachedHumano = (convStages||[]).filter((c:any)=>(Number(c.current_stage)||0)===99 || (Number(c.current_stage)||0)>=99).length;
+    const iaTaxaConclusao = totalConvs > 0 ? Math.round((reachedStage6/totalConvs)*100) : 0;
+    const iaHandoffHumano = totalConvs > 0 ? Math.round((reachedHumano/totalConvs)*100) : 0;
+
+    // RD Station em paralelo
+    const [fupDeals, pacientesDeals] = await Promise.all([
+      getAllRdDeals(PIPELINE_FUP),
+      getAllRdDeals(PIPELINE_PACIENTES),
+    ]);
+
+    // Follow-up (RD Station)
+    const fupAtivos = fupDeals.filter((d:any)=>d.deal_stage?.name?.startsWith("FUP")).length;
+    const fupExpirados = fupDeals.filter((d:any)=>d.deal_stage?.name==="NUTRIÇÃO").length;
+    const fupTotal = Math.max(fupDeals.length, fupTracking?.length || 0);
+
+    // FUP stats da tabela follow_up_tracking
+    const fupTrackingAll = fupTracking || [];
+    const fupTrackingTotal = fupTrackingAll.length;
+    const fupRespondidos = fupTrackingAll.filter((r:any)=>r.status==="responded").length;
+    const fupTaxaReengajamento = fupTrackingTotal > 0 ? Math.round((fupRespondidos/fupTrackingTotal)*100) : 0;
+
+    const fupStatsMap: Record<string,{enviados:number;respondidos:number;conversoes:number}> = {};
+    for (let i = 1; i <= 7; i++) fupStatsMap[`FUP${i}`] = { enviados: 0, respondidos: 0, conversoes: 0 };
+    fupTrackingAll.forEach((r:any) => {
+      const n = Number(r.follow_up_count) || 1;
+      for (let i = 1; i <= Math.min(n, 7); i++) {
+        if (fupStatsMap[`FUP${i}`]) fupStatsMap[`FUP${i}`].enviados++;
+      }
+      if (r.status === "responded") {
+        const key = `FUP${Math.min(n, 7)}`;
+        if (fupStatsMap[key]) fupStatsMap[key].respondidos++;
+      }
+    });
+    const fupStats = Object.entries(fupStatsMap).map(([fup,stats]) => ({ fup, ...stats }));
+
+    // Financeiro (RD Station pacientes ativos)
+    let finFaturamentoTotal = 0;
+    let finTrimestralCount = 0, finSemestralCount = 0;
+    let finTrimestralValor = 0, finSemestralValor = 0;
+    const finFatHistMap: Record<string,number> = {};
+
+    pacientesDeals.forEach((d:any) => {
+      const valor = d.amount_total || 0;
+      finFaturamentoTotal += valor;
+
+      // Determina plano pelo valor ou campo customizado
+      const fields = d.deal_custom_fields || [];
+      const planField = fields.find((f:any)=>
+        f.custom_field?.label?.toLowerCase().includes("plano") ||
+        (f.value||"").toLowerCase().includes("trimestral") ||
+        (f.value||"").toLowerCase().includes("semestral")
+      );
+      const planName = (planField?.value||"").toLowerCase();
+      const isTrimestral = planName.includes("trimestral") || (valor > 0 && valor <= 600);
+      if (isTrimestral) { finTrimestralCount++; finTrimestralValor += valor; }
+      else { finSemestralCount++; finSemestralValor += valor; }
+
+      if (d.created_at) {
+        const mk = d.created_at.slice(0, 7);
+        finFatHistMap[mk] = (finFatHistMap[mk]||0) + valor;
+      }
+    });
+
+    const totalPacientes = pacientesDeals.length;
+    const finTicketMedio = totalPacientes > 0 ? Math.round(finFaturamentoTotal/totalPacientes) : 0;
+    const finMrr = Math.round(finTrimestralValor/3 + finSemestralValor/6);
+    const finLtvTrimestral = finTrimestralCount > 0 ? Math.round(finTrimestralValor/finTrimestralCount) : 497;
+    const finLtvSemestral = finSemestralCount > 0 ? Math.round(finSemestralValor/finSemestralCount) : 847;
+
+    // Histórico faturamento 6 meses
+    const finFatHistorico = Array.from({length:6},(_,i)=>{
+      const { key, label } = monthLabel(5-i);
+      return { month: label, value: finFatHistMap[key]||0 };
+    });
+
+    const taxaConversao = (totalLeads||0) > 0 ? Math.round((totalPacientes/(totalLeads||1))*100) : 0;
+    const vendasHoje = pacientesDeals.filter((d:any)=>d.created_at>=todayStr.slice(0,10)).length;
+
+    return NextResponse.json({
+      // Funil
+      leads_hoje: leadsHoje ?? 0,
+      leads_semana: leadsSemana ?? 0,
+      leads_mes: leadsMes ?? 0,
+      vendas_hoje: vendasHoje,
+      taxa_conversao: taxaConversao,
+      total_leads: totalLeads ?? 0,
+      total_conversas: totalConvs,
+      funil_etapas: funnelEtapas,
+      leads_por_dia: leadsPorDia,
+      // IA
+      ia_taxa_conclusao: iaTaxaConclusao,
+      ia_handoff_humano: iaHandoffHumano,
+      ia_abandono_por_etapa: iaAbandonoPorEtapa,
+      // Follow-up
+      fup_ativos: Math.max(fupAtivos, fupTrackingTotal),
+      fup_expirados: fupExpirados,
+      fup_total: fupTotal,
+      fup_taxa_reengajamento: fupTaxaReengajamento,
+      fup_conversoes: 0,
+      fup_stats: fupStats,
+      // Financeiro
+      fin_faturamento_total: finFaturamentoTotal,
+      fin_mrr: finMrr,
+      fin_ticket_medio: finTicketMedio,
+      fin_ltv_trimestral: finLtvTrimestral,
+      fin_ltv_semestral: finLtvSemestral,
+      fin_trimestral_count: finTrimestralCount,
+      fin_semestral_count: finSemestralCount,
+      fin_trimestral_valor: finTrimestralValor,
+      fin_semestral_valor: finSemestralValor,
+      fin_renov_ate_30: 0,
+      fin_renov_30_60: 0,
+      fin_renov_60_90: 0,
+      fin_renov_90_365: 0,
+      fin_churn: 0,
+      fin_faturamento_historico: finFatHistorico,
+      fin_mix_planos: [
+        { plano: "Trimestral", count: finTrimestralCount, valor: finTrimestralValor },
+        { plano: "Semestral", count: finSemestralCount, valor: finSemestralValor },
+      ],
+      total_pacientes: totalPacientes,
+    });
+
+  } catch (e: any) {
+    console.error("silvestre api error:", e);
+    return NextResponse.json({ error: e.message || "Erro interno" }, { status: 500 });
+  }
+}

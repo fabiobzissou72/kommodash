@@ -184,10 +184,6 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
 .db-footer { border-top: 0.5px solid var(--border); padding: 20px 32px; margin-top: 40px; display: flex; justify-content: space-between; align-items: center; }
 .db-footer span { font-size: 12px; color: var(--text3); font-family: var(--mono); }
 
-/* SPINNER */
-.loading { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--text3); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
 @media (max-width: 900px) {
   .kpi-grid-4 { grid-template-columns: 1fr 1fr; }
   .chart-grid-2 { grid-template-columns: 1fr; }
@@ -207,16 +203,16 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
     </div>
   </div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('funil',this)">Funil</button>
-    <button class="nav-tab" onclick="showPage('ia',this)">IA &amp; Qualificação</button>
-    <button class="nav-tab" onclick="showPage('followup',this)">Follow-up</button>
-    <button class="nav-tab" onclick="showPage('financeiro',this)">Financeiro</button>
-    <button class="nav-tab" onclick="showPage('alertas',this)">Alertas</button>
+    <button class="nav-tab active" onclick="showPage('funil')">Funil</button>
+    <button class="nav-tab" onclick="showPage('ia')">IA &amp; Qualificação</button>
+    <button class="nav-tab" onclick="showPage('followup')">Follow-up</button>
+    <button class="nav-tab" onclick="showPage('financeiro')">Financeiro</button>
+    <button class="nav-tab" onclick="showPage('alertas')">Alertas</button>
   </div>
-  <div class="nav-meta" id="nav-date">carregando…</div>
+  <div class="nav-meta">24/03/2026 · atualizado</div>
 </nav>
 
-<!-- ─────────────────────────────────────────── FUNIL -->
+<!-- ─────────────────────────── FUNIL -->
 <div class="page active" id="page-funil">
   <div class="section-head">
     <div class="section-label">Módulo 01</div>
@@ -225,28 +221,28 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
 
   <div class="alert-bar">
     <div class="dot"></div>
-    <span id="alert-text">Carregando alertas…</span>
+    <span>3 alertas ativos: 38 leads com Bug IA · 25 tarefas vencidas · Meta mensal não configurada</span>
   </div>
 
   <div class="kpi-grid kpi-grid-4">
     <div class="kpi blue">
       <div class="kpi-lbl">Leads mês atual</div>
-      <div class="kpi-val blue" id="k-leads-mes"><span class="loading"></span></div>
-      <div class="kpi-sub" id="k-leads-semana">–</div>
+      <div class="kpi-val blue">250</div>
+      <div class="kpi-sub">155 esta semana</div>
     </div>
     <div class="kpi amber">
       <div class="kpi-lbl">Taxa de conversão</div>
-      <div class="kpi-val amber" id="k-conv"><span class="loading"></span></div>
+      <div class="kpi-val amber">14,0%</div>
       <div class="kpi-badge warn">Ref: 25–35%</div>
     </div>
     <div class="kpi amber">
-      <div class="kpi-lbl">Tempo médio resposta</div>
-      <div class="kpi-val amber" id="k-tempo"><span class="loading"></span></div>
-      <div class="kpi-badge warn" id="k-tempo-badge">–</div>
+      <div class="kpi-lbl">Tempo médio fechamento</div>
+      <div class="kpi-val amber">127h</div>
+      <div class="kpi-badge warn">Ref: &lt; 72h</div>
     </div>
     <div class="kpi red">
       <div class="kpi-lbl">Tarefas atrasadas</div>
-      <div class="kpi-val red" id="k-tarefas"><span class="loading"></span></div>
+      <div class="kpi-val red">25</div>
       <div class="kpi-badge err">Vencidas</div>
     </div>
   </div>
@@ -254,26 +250,26 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
   <div class="kpi-grid kpi-grid-3">
     <div class="kpi green">
       <div class="kpi-lbl">Total ganhos</div>
-      <div class="kpi-val green" id="k-ganhos"><span class="loading"></span></div>
-      <div class="kpi-sub" id="k-ganhos-sub">–</div>
+      <div class="kpi-val green">203</div>
+      <div class="kpi-sub">R$ 74.124 em receita</div>
     </div>
     <div class="kpi red">
       <div class="kpi-lbl">Total perdidos</div>
-      <div class="kpi-val red" id="k-perdidos"><span class="loading"></span></div>
-      <div class="kpi-sub" id="k-perdidos-sub">–</div>
+      <div class="kpi-val red">1.242</div>
+      <div class="kpi-sub">6,1× mais que ganhos</div>
     </div>
     <div class="kpi blue">
       <div class="kpi-lbl">Leads ativos</div>
-      <div class="kpi-val blue" id="k-ativos"><span class="loading"></span></div>
-      <div class="kpi-sub" id="k-ativos-sub">–</div>
+      <div class="kpi-val blue">2.793</div>
+      <div class="kpi-sub">Ticket médio R$ 365</div>
     </div>
   </div>
 
   <div class="chart-grid chart-grid-2">
     <div class="card">
       <div class="card-title">Volume por etapa do funil</div>
-      <div class="card-sub">Leads ativos em cada fase — do maior para o menor</div>
-      <div style="position:relative;height:300px"><canvas id="c-vol"></canvas></div>
+      <div class="card-sub">Leads ativos em cada fase</div>
+      <div style="position:relative;height:420px"><canvas id="c-vol"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">Ganhos vs perdidos</div>
@@ -281,7 +277,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
       <div style="position:relative;height:140px"><canvas id="c-donut"></canvas></div>
       <div class="insight" style="margin-top:16px">
         <div class="insight-title">Oportunidade de melhoria</div>
-        <div class="insight-text" id="insight-conv">Se a taxa de conversão fosse de 25%, haveria mais pacientes fechados com receita adicional significativa.</div>
+        <div class="insight-text">Se a taxa de conversão fosse de 25%, haveria +278 pacientes fechados — receita adicional estimada de R$ 101.670</div>
       </div>
     </div>
   </div>
@@ -303,7 +299,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
   </div>
 </div>
 
-<!-- ─────────────────────────────────────────── IA -->
+<!-- ─────────────────────────── IA -->
 <div class="page" id="page-ia">
   <div class="section-head">
     <div class="section-label">Módulo 02</div>
@@ -401,7 +397,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
   </div>
 </div>
 
-<!-- ─────────────────────────────────────────── FOLLOW-UP -->
+<!-- ─────────────────────────── FOLLOW-UP -->
 <div class="page" id="page-followup">
   <div class="section-head">
     <div class="section-label">Módulo 03</div>
@@ -411,18 +407,18 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
   <div class="kpi-grid kpi-grid-4">
     <div class="kpi blue">
       <div class="kpi-lbl">Leads na cadência ativa</div>
-      <div class="kpi-val blue" id="k-fup-ativos"><span class="loading"></span></div>
+      <div class="kpi-val blue">1.056</div>
       <div class="kpi-sub">FU1 a FU7 em andamento</div>
     </div>
     <div class="kpi amber">
       <div class="kpi-lbl">Taxa de reengajamento</div>
-      <div class="kpi-val amber" id="k-reeng">–</div>
+      <div class="kpi-val amber">18%</div>
       <div class="kpi-sub">Responderam ao menos 1 FU</div>
     </div>
     <div class="kpi green">
       <div class="kpi-lbl">Conversões via follow-up</div>
-      <div class="kpi-val green" id="k-fup-conv"><span class="loading"></span></div>
-      <div class="kpi-sub" id="k-fup-conv-sub">–</div>
+      <div class="kpi-val green">37</div>
+      <div class="kpi-sub">18% dos 203 fechamentos</div>
     </div>
     <div class="kpi red">
       <div class="kpi-lbl">Leads expirados</div>
@@ -509,7 +505,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
   </div>
 </div>
 
-<!-- ─────────────────────────────────────────── FINANCEIRO -->
+<!-- ─────────────────────────── FINANCEIRO -->
 <div class="page" id="page-financeiro">
   <div class="section-head">
     <div class="section-label">Módulo 04</div>
@@ -519,53 +515,53 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
   <div class="kpi-grid kpi-grid-4">
     <div class="kpi green">
       <div class="kpi-lbl">Faturamento total</div>
-      <div class="kpi-val green" id="k-fat-total"><span class="loading"></span></div>
-      <div class="kpi-sub" id="k-fat-pac">–</div>
+      <div class="kpi-val green">R$ 23.496</div>
+      <div class="kpi-sub">41 pacientes ativos</div>
     </div>
     <div class="kpi green">
       <div class="kpi-lbl">MRR estimado</div>
-      <div class="kpi-val green" id="k-mrr"><span class="loading"></span></div>
+      <div class="kpi-val green">R$ 7.832</div>
       <div class="kpi-sub">Recorrência mensal</div>
     </div>
     <div class="kpi blue">
       <div class="kpi-lbl">Ticket médio / paciente</div>
-      <div class="kpi-val blue" id="k-ticket"><span class="loading"></span></div>
+      <div class="kpi-val blue">R$ 573</div>
       <div class="kpi-sub">98% com plano identificado</div>
     </div>
     <div class="kpi amber">
-      <div class="kpi-lbl">Churn último mês</div>
-      <div class="kpi-val amber" id="k-churn"><span class="loading"></span></div>
-      <div class="kpi-sub">Pacientes perdidos</div>
+      <div class="kpi-lbl">Meta mensal</div>
+      <div class="kpi-val amber">—</div>
+      <div class="kpi-badge warn">Configurar agora</div>
     </div>
   </div>
 
   <div class="kpi-grid kpi-grid-4">
     <div class="kpi">
       <div class="kpi-lbl">LTV trimestral est.</div>
-      <div class="kpi-val" id="k-ltv3">–</div>
+      <div class="kpi-val">R$ 573</div>
       <div class="kpi-sub">1 ciclo de 3 meses</div>
     </div>
     <div class="kpi green">
       <div class="kpi-lbl">LTV semestral est.</div>
-      <div class="kpi-val green" id="k-ltv6">–</div>
+      <div class="kpi-val green">R$ 1.146</div>
       <div class="kpi-sub">2× maior que trimestral</div>
     </div>
     <div class="kpi amber">
       <div class="kpi-lbl">Renovações em 90 dias</div>
-      <div class="kpi-val amber" id="k-renov90"><span class="loading"></span></div>
+      <div class="kpi-val amber">26</div>
       <div class="kpi-sub">Pacientes trimestrais</div>
     </div>
     <div class="kpi amber">
-      <div class="kpi-lbl">Vencendo em 30 dias</div>
-      <div class="kpi-val amber" id="k-venc30"><span class="loading"></span></div>
-      <div class="kpi-sub">Atenção imediata</div>
+      <div class="kpi-lbl">Taxa de churn</div>
+      <div class="kpi-val amber">—</div>
+      <div class="kpi-badge warn">A implementar</div>
     </div>
   </div>
 
   <div class="chart-grid chart-grid-2">
     <div class="card full">
-      <div class="card-title">Evolução do faturamento — últimos 6 meses</div>
-      <div class="card-sub">Receita mensal por data de entrada dos pacientes ativos</div>
+      <div class="card-title">Evolução do faturamento — últimos 6 meses + projeção</div>
+      <div class="card-sub">Receita mensal realizada e projeção de crescimento com otimizações</div>
       <div style="position:relative;height:220px"><canvas id="c-fat"></canvas></div>
     </div>
   </div>
@@ -576,8 +572,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
       <div class="card-sub">Distribuição por modalidade e receita estimada</div>
       <div style="position:relative;height:160px"><canvas id="c-planos"></canvas></div>
       <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--text3)">
-        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#4A9EFF;display:inline-block"></span>Trimestral · <span id="leg-trim">26</span></span>
-        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#A78BFA;display:inline-block"></span>Semestral · <span id="leg-sem">14</span></span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#4A9EFF;display:inline-block"></span>Trimestral · 26</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#A78BFA;display:inline-block"></span>Semestral · 14</span>
       </div>
 
       <div class="insight" style="margin-top:16px">
@@ -588,36 +584,40 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
 
     <div class="card">
       <div class="card-title">Renovações — próximos 90 dias</div>
-      <div class="card-sub" id="renov-sub">Pacientes trimestrais com vencimento próximo</div>
+      <div class="card-sub">26 pacientes trimestrais com vencimento próximo</div>
 
       <div class="renov-row">
         <div class="renov-name"><div class="renov-dot" style="background:var(--red)"></div>Vencem em até 30 dias</div>
-        <div class="renov-val" style="color:var(--red)" id="r-30">–</div>
+        <div class="renov-val" style="color:var(--red)">9 pac.</div>
       </div>
       <div class="renov-row">
         <div class="renov-name"><div class="renov-dot" style="background:var(--amber)"></div>Vencem em 30–60 dias</div>
-        <div class="renov-val" style="color:var(--amber)" id="r-60">–</div>
+        <div class="renov-val" style="color:var(--amber)">10 pac.</div>
       </div>
       <div class="renov-row">
         <div class="renov-name"><div class="renov-dot" style="background:var(--green)"></div>Vencem em 60–90 dias</div>
-        <div class="renov-val" style="color:var(--green)" id="r-90">–</div>
+        <div class="renov-val" style="color:var(--green)">7 pac.</div>
       </div>
 
-      <div style="margin-top:14px;background:rgba(255,107,107,0.08);border:0.5px solid rgba(255,107,107,0.2);border-radius:8px;padding:12px;font-size:12px;color:var(--red)" id="r-alert">
-        Calculando risco de receita…
+      <div style="margin-top:14px;background:rgba(255,107,107,0.08);border:0.5px solid rgba(255,107,107,0.2);border-radius:8px;padding:12px;font-size:12px;color:var(--red)">
+        9 pacientes precisam de contato de retenção imediato — risco de R$ 5.157 em receita recorrente
       </div>
 
       <div style="margin-top:12px">
         <div class="prog-row">
-          <div class="prog-label"><span>Pacientes com plano identificado</span><span id="prog-plano">98%</span></div>
-          <div class="prog-track"><div class="prog-fill" id="prog-plano-fill" style="width:98%;background:var(--green)"></div></div>
+          <div class="prog-label"><span>Pacientes com plano identificado</span><span>98%</span></div>
+          <div class="prog-track"><div class="prog-fill" style="width:98%;background:var(--green)"></div></div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-label"><span>Taxa de tag de plano preenchida</span><span>98%</span></div>
+          <div class="prog-track"><div class="prog-fill" style="width:98%;background:var(--blue)"></div></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ─────────────────────────────────────────── ALERTAS -->
+<!-- ─────────────────────────── ALERTAS -->
 <div class="page" id="page-alertas">
   <div class="section-head">
     <div class="section-label">Módulo 05</div>
@@ -639,7 +639,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
       <div class="alert-item">
         <div class="alert-sev high"></div>
         <div class="alert-body">
-          <div class="alert-title" id="alert-tarefas-title">25 tarefas com prazo vencido</div>
+          <div class="alert-title">25 tarefas com prazo vencido</div>
           <div class="alert-desc">Classificar por tipo: follow-up, pagamento, confirmação de consulta</div>
         </div>
         <span class="badge low" style="background:var(--red-bg);color:var(--red);flex-shrink:0">Alta</span>
@@ -660,7 +660,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
       <div class="alert-item">
         <div class="alert-sev mid"></div>
         <div class="alert-body">
-          <div class="alert-title" id="alert-perdidos-title">Leads sem motivo de perda</div>
+          <div class="alert-title">1.242 leads sem motivo de perda</div>
           <div class="alert-desc">Criar campo obrigatório de motivo no descarte de leads</div>
         </div>
         <span class="badge mid" style="flex-shrink:0">Média</span>
@@ -668,7 +668,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
       <div class="alert-item">
         <div class="alert-sev mid"></div>
         <div class="alert-body">
-          <div class="alert-title" id="alert-conv-title">Conversão abaixo da referência</div>
+          <div class="alert-title">Conversão 14% vs referência 25–35%</div>
           <div class="alert-desc">Gap de 11–21 p.p. — mapear gargalo por etapa com campo Etapa_IA_Parou</div>
         </div>
         <span class="badge mid" style="flex-shrink:0">Média</span>
@@ -676,8 +676,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
       <div class="alert-item">
         <div class="alert-sev mid"></div>
         <div class="alert-body">
-          <div class="alert-title" id="alert-renov-title">9 pacientes trimestrais vencem em 30 dias</div>
-          <div class="alert-desc">Risco de receita — acionar campanha de retenção</div>
+          <div class="alert-title">9 pacientes trimestrais vencem em 30 dias</div>
+          <div class="alert-desc">Risco de R$ 5.157 em receita — acionar campanha de retenção</div>
         </div>
         <span class="badge mid" style="flex-shrink:0">Média</span>
       </div>
@@ -709,34 +709,18 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
 
 <footer class="db-footer">
   <span>AMAP Consultoria de Marketing · amapmed.kommo.com</span>
-  <span>Nutri Silvestre · <span id="footer-date">–</span> · Uso interno</span>
+  <span>Nutri Silvestre · Março 2026 · Uso interno</span>
 </footer>
 
 <script>
-/* ── navegação ── */
-function showPage(id, btn) {
+function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
-  btn.classList.add('active');
+  event.target.classList.add('active');
 }
 
-/* ── helpers ── */
-const fmt = n => new Intl.NumberFormat('pt-BR').format(n);
-const brl = n => 'R$ ' + new Intl.NumberFormat('pt-BR', {minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
-const pct = n => n.toFixed(1).replace('.',',') + '%';
-
-function set(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = val;
-}
-
-/* ── data ── */
-const now = new Date();
-const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-set('nav-date', now.toLocaleDateString('pt-BR') + ' · atualizado');
-set('footer-date', monthNames[now.getMonth()] + ' ' + now.getFullYear());
-
+const DARK = true;
 const T = '#8B90A0';
 const G = 'rgba(255,255,255,0.06)';
 const base = {
@@ -748,296 +732,136 @@ const base = {
   }
 };
 
-/* charts que começam com dados estáticos e depois recebem dados dinâmicos */
-let chartVol, chartDonut, chartFunil, chartLinha, chartFat, chartPlanos;
+/* Volume por etapa — ordenado do maior para o menor, barras grossas */
+const volLabels = ['Nutrição','Follow 1','Follow up','Em atend.','Contato inicial','Humano','Lead quente','Bug IA','Aguard.'];
+const volData   = [1250,758,298,151,127,79,42,38,3];
+const volColors = ['#00D4A0','#4A9EFF','#A78BFA','#4A9EFF','#8B90A0','#FFB347','#00D4A0','#FF6B6B','#8B90A0'];
+const volPairs  = volLabels.map((l,i) => ({l, v: volData[i], c: volColors[i]}))
+                           .sort((a,b) => b.v - a.v);
 
-function initStaticCharts() {
-  /* IA (estáticos) */
-  new Chart(document.getElementById('c-ia-stack'), {
-    type: 'bar',
-    data: {
-      labels: ['P0','P1','P2','P3','P4','OK'],
-      datasets: [
-        { label: 'Chegaram', data: [2793,2011,1229,726,447,79], backgroundColor: 'rgba(74,158,255,0.25)', borderColor: '#4A9EFF', borderWidth: 1.5, borderRadius: 4 },
-        { label: 'Abandonaram', data: [0,782,782,503,279,368], backgroundColor: 'rgba(255,107,107,0.25)', borderColor: '#FF6B6B', borderWidth: 1.5, borderRadius: 4 }
-      ]
-    },
-    options: { ...base, plugins: { legend: { display: true, position: 'bottom', labels: { color: T, font: { size: 11 }, padding: 12, boxWidth: 10 } } } }
-  });
+new Chart(document.getElementById('c-vol'), {
+  type: 'bar',
+  data: {
+    labels: volPairs.map(p => p.l),
+    datasets: [{
+      data: volPairs.map(p => p.v),
+      backgroundColor: volPairs.map(p => p.c),
+      borderRadius: 4,
+      borderSkipped: false,
+      barThickness: 38
+    }]
+  },
+  options: { ...base, indexAxis: 'y',
+    scales: { x: base.scales.x, y: { ticks: { color: T, font: { size: 11 } }, grid: { color: G } } } }
+});
 
-  new Chart(document.getElementById('c-bug'), {
-    type: 'line',
-    data: {
-      labels: ['S1 Fev','S2 Fev','S3 Fev','S4 Fev','S1 Mar','S2 Mar','S3 Mar','S4 Mar'],
-      datasets: [{ data: [4,6,8,7,9,12,10,38], borderColor: '#FF6B6B', backgroundColor: 'rgba(255,107,107,0.08)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#FF6B6B' }]
-    },
-    options: { ...base }
-  });
+new Chart(document.getElementById('c-donut'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Ganhos (203)', 'Perdidos (1.242)'],
+    datasets: [{ data: [203, 1242], backgroundColor: ['#00D4A0', '#FF6B6B'], borderWidth: 0, hoverOffset: 4 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, cutout: '72%',
+    plugins: { legend: { display: true, position: 'right', labels: { color: T, font: { size: 11 }, padding: 12, boxWidth: 10 } } } }
+});
 
-  new Chart(document.getElementById('c-tempo-ia'), {
-    type: 'bar', data: {
-      labels: ['P0→P1','P1→P2','P2→P3','P3→P4','P4→OK'],
-      datasets: [{ data: [12,18,24,22,31], backgroundColor: ['#00D4A0','#4A9EFF','#A78BFA','#FFB347','#FF6B6B'], borderRadius: 4 }]
-    },
-    options: { ...base, indexAxis: 'y',
-      scales: { x: { ...base.scales.x, ticks: { ...base.scales.x.ticks, callback: v => v + 'min' } }, y: base.scales.y } }
-  });
+new Chart(document.getElementById('c-funil'), {
+  type: 'bar',
+  data: {
+    labels: ['Entrou (2.793)', 'Contatou (1.445)', 'IA resp. (630)', 'Qualificado (280)', 'Humano (79)', 'Fechou (203)'],
+    datasets: [{ data: [2793,1445,630,280,79,203],
+      backgroundColor: ['#4A9EFF','#4A9EFF','#A78BFA','#A78BFA','#FFB347','#00D4A0'], borderRadius: 4 }]
+  },
+  options: { ...base }
+});
 
-  /* follow-up (estáticos) */
-  new Chart(document.getElementById('c-fu-bar'), {
-    type: 'bar',
-    data: {
-      labels: ['FU1 · 4h','FU2 · 48h','FU3 · 48h','FU4 · 48h','FU5 · 48h','FU6 · 48h','FU7 · 48h'],
-      datasets: [{ data: [15,12,8,6,5,4,2], backgroundColor: ['#00D4A0','#00D4A0','#FFB347','#FFB347','#FFB347','#FF6B6B','#FF6B6B'], borderRadius: 4 }]
-    },
-    options: { ...base, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw + '% de taxa de resposta' } } },
-      scales: { x: base.scales.x, y: { ...base.scales.y, ticks: { ...base.scales.y.ticks, callback: v => v + '%' } } } }
-  });
+const dias = ['23/2','25/2','27/2','1/3','3/3','5/3','7/3','9/3','11/3','13/3','15/3','17/3','19/3','21/3','23/3','24/3'];
+new Chart(document.getElementById('c-linha'), {
+  type: 'line',
+  data: { labels: dias, datasets: [{
+    data: [42,78,65,95,88,72,105,120,98,135,110,87,95,63,45,42],
+    borderColor: '#4A9EFF', backgroundColor: 'rgba(74,158,255,0.08)', fill: true,
+    tension: 0.4, pointRadius: 2, pointBackgroundColor: '#4A9EFF'
+  }]},
+  options: { ...base, scales: { x: { ...base.scales.x, ticks: { ...base.scales.x.ticks, maxTicksLimit: 8 } }, y: base.scales.y } }
+});
 
-  new Chart(document.getElementById('c-fu-conv'), {
-    type: 'bar',
-    data: {
-      labels: ['FU1','FU2','FU3','FU4','FU5','FU6','FU7'],
-      datasets: [{ data: [12,9,6,4,3,2,1], backgroundColor: 'rgba(167,139,250,0.7)', borderRadius: 4 }]
-    },
-    options: { ...base }
-  });
-}
+new Chart(document.getElementById('c-ia-stack'), {
+  type: 'bar',
+  data: {
+    labels: ['P0','P1','P2','P3','P4','OK'],
+    datasets: [
+      { label: 'Chegaram', data: [2793,2011,1229,726,447,79], backgroundColor: 'rgba(74,158,255,0.25)', borderColor: '#4A9EFF', borderWidth: 1.5, borderRadius: 4 },
+      { label: 'Abandonaram', data: [0,782,782,503,279,368], backgroundColor: 'rgba(255,107,107,0.25)', borderColor: '#FF6B6B', borderWidth: 1.5, borderRadius: 4 }
+    ]
+  },
+  options: { ...base, plugins: { legend: { display: true, position: 'bottom', labels: { color: T, font: { size: 11 }, padding: 12, boxWidth: 10 } } } }
+});
 
-function renderDynamic(d) {
-  /* ── data formatada ── */
-  const hoje = new Date();
-  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-  const inicioSemana = new Date(hoje); inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+new Chart(document.getElementById('c-bug'), {
+  type: 'line',
+  data: {
+    labels: ['S1 Fev','S2 Fev','S3 Fev','S4 Fev','S1 Mar','S2 Mar','S3 Mar','S4 Mar'],
+    datasets: [{ data: [4,6,8,7,9,12,10,38], borderColor: '#FF6B6B', backgroundColor: 'rgba(255,107,107,0.08)',
+      fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#FF6B6B' }]
+  },
+  options: { ...base }
+});
 
-  /* KPIs Funil */
-  set('k-leads-mes', fmt(d.leadsThisMonth ?? d.totalLeads ?? '–'));
-  set('k-leads-semana', fmt(d.leadsThisWeek ?? '–') + ' esta semana');
-  const ganhos = d.wonCount ?? d.won ?? 0;
-  const perdidos = d.lostCount ?? d.lost ?? 0;
-  const ativos = d.activeLeads ?? d.total ?? 0;
-  const convRate = ativos > 0 ? (ganhos / (ganhos + perdidos) * 100) : 0;
-  set('k-conv', pct(convRate));
-  set('k-ganhos', fmt(ganhos));
-  set('k-ganhos-sub', brl(d.revenue ?? d.totalRevenue ?? 0) + ' em receita');
-  set('k-perdidos', fmt(perdidos));
-  set('k-perdidos-sub', ganhos > 0 ? (perdidos/ganhos).toFixed(1) + '× mais que ganhos' : '–');
-  set('k-ativos', fmt(ativos));
-  set('k-ativos-sub', 'Ticket médio ' + brl(d.avgTicket ?? (d.revenue ?? 0) / (ganhos || 1)));
-  set('k-tarefas', fmt(d.overdueTasks ?? d.tasks ?? 0));
+new Chart(document.getElementById('c-tempo-ia'), {
+  type: 'bar', data: {
+    labels: ['P0→P1','P1→P2','P2→P3','P3→P4','P4→OK'],
+    datasets: [{ data: [12,18,24,22,31], backgroundColor: ['#00D4A0','#4A9EFF','#A78BFA','#FFB347','#FF6B6B'], borderRadius: 4 }]
+  },
+  options: { ...base, indexAxis: 'y',
+    scales: { x: { ...base.scales.x, ticks: { ...base.scales.x.ticks, callback: v => v + 'min' } }, y: base.scales.y } }
+});
 
-  /* Tempo médio resposta */
-  if (d.avgResponseTime != null) {
-    const hrs = Math.round(d.avgResponseTime / 3600);
-    set('k-tempo', hrs + 'h');
-    set('k-tempo-badge', hrs > 72 ? 'Acima de 72h' : 'Dentro do ref.');
-  } else {
-    set('k-tempo', '–');
-    set('k-tempo-badge', 'Sem dados');
+new Chart(document.getElementById('c-fu-bar'), {
+  type: 'bar',
+  data: {
+    labels: ['FU1 · 4h','FU2 · 48h','FU3 · 48h','FU4 · 48h','FU5 · 48h','FU6 · 48h','FU7 · 48h'],
+    datasets: [{ data: [15,12,8,6,5,4,2],
+      backgroundColor: ['#00D4A0','#00D4A0','#FFB347','#FFB347','#FFB347','#FF6B6B','#FF6B6B'], borderRadius: 4 }]
+  },
+  options: { ...base, plugins: { legend: { display: false },
+    tooltip: { callbacks: { label: c => c.raw + '% de taxa de resposta' } } },
+    scales: { x: { ...base.scales.x }, y: { ...base.scales.y, ticks: { ...base.scales.y.ticks, callback: v => v + '%' } } } }
+});
+
+new Chart(document.getElementById('c-fu-conv'), {
+  type: 'bar',
+  data: {
+    labels: ['FU1','FU2','FU3','FU4','FU5','FU6','FU7'],
+    datasets: [{ data: [12,9,6,4,3,2,1], backgroundColor: 'rgba(167,139,250,0.7)', borderRadius: 4 }]
+  },
+  options: { ...base }
+});
+
+new Chart(document.getElementById('c-fat'), {
+  type: 'bar',
+  data: {
+    labels: ['Out/25','Nov/25','Dez/25','Jan/26','Fev/26','Mar/26','Abr/26 ⸱','Mai/26 ⸱'],
+    datasets: [
+      { label: 'Realizado', data: [14200,16800,18400,19200,21600,23496,null,null], backgroundColor: '#4A9EFF', borderRadius: 4 },
+      { label: 'Projeção', data: [null,null,null,null,null,23496,26000,29000], backgroundColor: 'rgba(0,212,160,0.35)', borderRadius: 4, borderWidth: 1.5, borderColor: '#00D4A0' }
+    ]
+  },
+  options: { ...base,
+    plugins: { legend: { display: true, position: 'bottom', labels: { color: T, font: { size: 11 }, padding: 14, boxWidth: 10 } } },
+    scales: { x: base.scales.x, y: { ...base.scales.y, ticks: { ...base.scales.y.ticks, callback: v => 'R$' + Math.round(v/1000) + 'k' } } }
   }
+});
 
-  /* Alert bar */
-  const bugIA = d.bugIACount ?? 38;
-  const tarefas = d.overdueTasks ?? 25;
-  set('alert-text', `${bugIA} leads com Bug IA · ${tarefas} tarefas vencidas · Meta mensal não configurada`);
-
-  /* Insight conversão */
-  if (ativos > 0) {
-    const extra = Math.round(ativos * 0.25) - ganhos;
-    const extraRev = extra * (d.avgTicket ?? 365);
-    set('insight-conv', `Se a taxa de conversão fosse de 25%, haveria +${fmt(extra > 0 ? extra : 0)} pacientes — receita adicional estimada de ${brl(extraRev > 0 ? extraRev : 0)}`);
-  }
-
-  /* KPIs Follow-up */
-  set('k-fup-ativos', fmt(d.fupAtivos ?? d.followupLeads ?? 0));
-  set('k-fup-conv', fmt(d.fup_conversoes ?? 0));
-  set('k-fup-conv-sub', ganhos > 0 ? Math.round((d.fup_conversoes ?? 0) / ganhos * 100) + '% dos fechamentos' : '–');
-  set('k-reeng', d.fupAtivos > 0 ? pct((d.fup_conversoes ?? 0) / d.fupAtivos * 100) : '–');
-
-  /* KPIs Financeiro */
-  const pacAtivos = d.pacientesAtivos ?? 41;
-  const faturamento = d.totalRevenue ?? d.revenue ?? 0;
-  const ticket = d.avgTicket ?? (pacAtivos > 0 ? faturamento / pacAtivos : 0);
-  const mrr = ticket > 500 ? faturamento / 3 : faturamento;
-  set('k-fat-total', brl(faturamento));
-  set('k-fat-pac', fmt(pacAtivos) + ' pacientes ativos');
-  set('k-mrr', brl(mrr));
-  set('k-ticket', brl(ticket));
-  set('k-churn', fmt(d.churn ?? 0));
-  set('k-ltv3', brl(ticket));
-  set('k-ltv6', brl(ticket * 2));
-
-  const trim = d.trimestral ?? 26;
-  const sem = d.semestral ?? 14;
-  set('k-renov90', fmt(trim));
-  set('leg-trim', fmt(trim));
-  set('leg-sem', fmt(sem));
-
-  const venc30 = d.vencendo30 ?? d.renovacoes30 ?? 9;
-  const venc60 = d.vencendo60 ?? d.renovacoes60 ?? 10;
-  const venc90 = d.vencendo90 ?? d.renovacoes90 ?? 7;
-  set('k-venc30', fmt(venc30));
-  set('r-30', fmt(venc30) + ' pac.');
-  set('r-60', fmt(venc60) + ' pac.');
-  set('r-90', fmt(venc90) + ' pac.');
-  set('renov-sub', fmt(trim) + ' pacientes trimestrais com vencimento próximo');
-  const risco = venc30 * ticket;
-  set('r-alert', `${venc30} pacientes precisam de contato de retenção imediato — risco de ${brl(risco)} em receita recorrente`);
-
-  /* Alertas dinâmicos */
-  set('alert-tarefas-title', `${tarefas} tarefas com prazo vencido`);
-  set('alert-perdidos-title', `${fmt(perdidos)} leads sem motivo de perda`);
-  set('alert-conv-title', `Conversão ${pct(convRate)} vs referência 25–35%`);
-  set('alert-renov-title', `${venc30} pacientes trimestrais vencem em 30 dias`);
-
-  /* ── CHART: Volume por etapa (maior → menor, barras grossas) ── */
-  const stagesRaw = d.stageStats ?? d.stages ?? null;
-  let stageLabels, stageData, stageColors;
-
-  if (stagesRaw && Array.isArray(stagesRaw)) {
-    const sorted = [...stagesRaw].sort((a,b) => b.count - a.count);
-    stageLabels = sorted.map(s => s.name);
-    stageData = sorted.map(s => s.count);
-    stageColors = sorted.map((_,i) => ['#00D4A0','#4A9EFF','#A78BFA','#4A9EFF','#8B90A0','#FFB347','#00D4A0','#FF6B6B','#8B90A0'][i % 9]);
-  } else {
-    /* fallback com dados estáticos */
-    stageLabels = ['Nutrição','Follow 1','Follow up','Em atend.','Contato inicial','Humano','Lead quente','Bug IA','Aguard.'];
-    stageData   = [1250,758,298,151,127,79,42,38,3];
-    stageColors = ['#00D4A0','#4A9EFF','#A78BFA','#4A9EFF','#8B90A0','#FFB347','#00D4A0','#FF6B6B','#8B90A0'];
-  }
-
-  if (chartVol) chartVol.destroy();
-  chartVol = new Chart(document.getElementById('c-vol'), {
-    type: 'bar',
-    data: {
-      labels: stageLabels,
-      datasets: [{
-        data: stageData,
-        backgroundColor: stageColors,
-        borderRadius: 4,
-        borderSkipped: false,
-        barThickness: 24
-      }]
-    },
-    options: {
-      ...base,
-      indexAxis: 'y',
-      scales: {
-        x: base.scales.x,
-        y: { ticks: { color: T, font: { size: 11 } }, grid: { color: G } }
-      }
-    }
-  });
-
-  /* ── CHART: Donut ganhos vs perdidos ── */
-  if (chartDonut) chartDonut.destroy();
-  chartDonut = new Chart(document.getElementById('c-donut'), {
-    type: 'doughnut',
-    data: {
-      labels: [`Ganhos (${fmt(ganhos)})`, `Perdidos (${fmt(perdidos)})`],
-      datasets: [{ data: [ganhos, perdidos], backgroundColor: ['#00D4A0','#FF6B6B'], borderWidth: 0, hoverOffset: 4 }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '72%',
-      plugins: { legend: { display: true, position: 'right', labels: { color: T, font: { size: 11 }, padding: 12, boxWidth: 10 } } } }
-  });
-
-  /* ── CHART: Funil de conversão ── */
-  if (chartFunil) chartFunil.destroy();
-  chartFunil = new Chart(document.getElementById('c-funil'), {
-    type: 'bar',
-    data: {
-      labels: ['Entrou','Contatou','IA resp.','Qualificado','Humano','Fechou'],
-      datasets: [{ data: [ativos + ganhos + perdidos, d.contacted ?? 1445, d.iaResp ?? 630, d.qualified ?? 280, d.human ?? 79, ganhos],
-        backgroundColor: ['#4A9EFF','#4A9EFF','#A78BFA','#A78BFA','#FFB347','#00D4A0'], borderRadius: 4 }]
-    },
-    options: { ...base }
-  });
-
-  /* ── CHART: Leads por dia ── */
-  const daily = d.daily ?? [];
-  if (daily.length && !chartLinha) {
-    chartLinha = new Chart(document.getElementById('c-linha'), {
-      type: 'line',
-      data: {
-        labels: daily.map(r => r.date ?? r.day),
-        datasets: [{
-          data: daily.map(r => r.count),
-          borderColor: '#4A9EFF', backgroundColor: 'rgba(74,158,255,0.08)', fill: true,
-          tension: 0.4, pointRadius: 2, pointBackgroundColor: '#4A9EFF'
-        }]
-      },
-      options: { ...base, scales: { x: { ...base.scales.x, ticks: { ...base.scales.x.ticks, maxTicksLimit: 8 } }, y: base.scales.y } }
-    });
-  } else if (!chartLinha) {
-    /* fallback estático */
-    const dias = ['23/2','25/2','27/2','1/3','3/3','5/3','7/3','9/3','11/3','13/3','15/3','17/3','19/3','21/3','23/3','24/3'];
-    chartLinha = new Chart(document.getElementById('c-linha'), {
-      type: 'line',
-      data: { labels: dias, datasets: [{ data: [42,78,65,95,88,72,105,120,98,135,110,87,95,63,45,42], borderColor: '#4A9EFF', backgroundColor: 'rgba(74,158,255,0.08)', fill: true, tension: 0.4, pointRadius: 2, pointBackgroundColor: '#4A9EFF' }]},
-      options: { ...base, scales: { x: { ...base.scales.x, ticks: { ...base.scales.x.ticks, maxTicksLimit: 8 } }, y: base.scales.y } }
-    });
-  }
-
-  /* ── CHART: Faturamento histórico ── */
-  const fatHist = d.faturamento_historico ?? [];
-  if (chartFat) chartFat.destroy();
-  if (fatHist.length) {
-    chartFat = new Chart(document.getElementById('c-fat'), {
-      type: 'bar',
-      data: {
-        labels: fatHist.map(r => r.month),
-        datasets: [{ label: 'Realizado', data: fatHist.map(r => r.value), backgroundColor: '#4A9EFF', borderRadius: 4 }]
-      },
-      options: { ...base,
-        plugins: { legend: { display: false } },
-        scales: { x: base.scales.x, y: { ...base.scales.y, ticks: { ...base.scales.y.ticks, callback: v => 'R$' + Math.round(v/1000) + 'k' } } }
-      }
-    });
-  } else {
-    /* fallback estático */
-    chartFat = new Chart(document.getElementById('c-fat'), {
-      type: 'bar',
-      data: {
-        labels: ['Out/25','Nov/25','Dez/25','Jan/26','Fev/26','Mar/26','Abr/26 ⸱','Mai/26 ⸱'],
-        datasets: [
-          { label: 'Realizado', data: [14200,16800,18400,19200,21600,23496,null,null], backgroundColor: '#4A9EFF', borderRadius: 4 },
-          { label: 'Projeção', data: [null,null,null,null,null,23496,26000,29000], backgroundColor: 'rgba(0,212,160,0.35)', borderRadius: 4, borderWidth: 1.5, borderColor: '#00D4A0' }
-        ]
-      },
-      options: { ...base,
-        plugins: { legend: { display: true, position: 'bottom', labels: { color: T, font: { size: 11 }, padding: 14, boxWidth: 10 } } },
-        scales: { x: base.scales.x, y: { ...base.scales.y, ticks: { ...base.scales.y.ticks, callback: v => 'R$' + Math.round(v/1000) + 'k' } } }
-      }
-    });
-  }
-
-  /* ── CHART: Mix de planos ── */
-  if (chartPlanos) chartPlanos.destroy();
-  chartPlanos = new Chart(document.getElementById('c-planos'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Trimestral','Semestral','Sem plano'],
-      datasets: [{ data: [trim, sem, d.semPlano ?? 1], backgroundColor: ['#4A9EFF','#A78BFA','#555D70'], borderWidth: 0, hoverOffset: 4 }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }
-  });
-}
-
-/* ── fetch da API ── */
-async function loadData() {
-  try {
-    const res = await fetch('/api/kommo');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const d = await res.json();
-    renderDynamic(d);
-  } catch (e) {
-    console.warn('API indisponível, usando dados estáticos:', e.message);
-    renderDynamic({});
-  }
-}
-
-initStaticCharts();
-loadData();
+new Chart(document.getElementById('c-planos'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Trimestral','Semestral','Sem plano'],
+    datasets: [{ data: [26,14,1], backgroundColor: ['#4A9EFF','#A78BFA','#555D70'], borderWidth: 0, hoverOffset: 4 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, cutout: '70%',
+    plugins: { legend: { display: false } } }
+});
 </script>
 </body>
 </html>

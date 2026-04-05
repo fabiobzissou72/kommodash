@@ -92,12 +92,12 @@ export async function POST(req: NextRequest) {
   const auth = req.cookies.get("auth");
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { subdomain?: string; token?: string; pipeline_id?: unknown };
+  let body: { subdomain?: string; token?: string; pipeline_id?: unknown; date_from?: string; date_to?: string };
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Requisição inválida" }, { status: 400 });
   }
 
-  const { subdomain: raw, token, pipeline_id: rawPid } = body;
+  const { subdomain: raw, token, pipeline_id: rawPid, date_from, date_to } = body;
   if (!raw || !token) return NextResponse.json({ error: "Credenciais obrigatórias" }, { status: 400 });
 
   const subdomain = String(raw).replace(/^https?:\/\//, "").replace(/\.kommo\.com.*$/, "").trim().toLowerCase();
@@ -111,10 +111,12 @@ export async function POST(req: NextRequest) {
     : null;
 
   try {
-    const ts = now();
-    const todayTs   = startOfDay();
-    const weekTs    = startOfWeek();
-    const monthTs   = startOfMonth();
+    const ts           = now();
+    const todayTs      = startOfDay();
+    const weekTs       = startOfWeek();
+    const realMonthTs  = startOfMonth();
+    const periodFromTs = date_from ? Math.floor(new Date(date_from + "T00:00:00").getTime() / 1000) : realMonthTs;
+    const periodToTs   = date_to   ? Math.floor(new Date(date_to   + "T23:59:59").getTime() / 1000) : ts;
     const yesterdayFrom = startOfDay(1);
     const yesterdayTo   = startOfDay(0);
 
@@ -139,11 +141,11 @@ export async function POST(req: NextRequest) {
 
     // === LOTE 2: Período atual (paralelo) ===
     const [
-      todayRes, weekRes, monthRes, wonTodayRes, lostTodayRes, wonAllData, lostAllData, tasksRes,
+      todayRes, weekRes, monthData, wonTodayRes, lostTodayRes, wonAllData, lostAllData, tasksRes,
     ] = await Promise.all([
       kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${todayTs}&filter[created_at][to]=${ts}&limit=250`),
-      kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${weekTs}&filter[created_at][to]=${ts}&limit=250`),
-      kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${monthTs}&filter[created_at][to]=${ts}&limit=250`),
+      kommoFetch(subdomain, safeToken, `/leads?filter[created_at][from]=${weekTs}&filter[created_at][to]=${ts}&limit=500`),
+      kommoFetchLeads(subdomain, safeToken, `/leads?filter[created_at][from]=${periodFromTs}&filter[created_at][to]=${periodToTs}`, 20),
       kommoFetch(subdomain, safeToken, `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142&limit=250`),
       kommoFetch(subdomain, safeToken, `/leads?filter[closed_at][from]=${todayTs}&filter[closed_at][to]=${ts}&filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=143&limit=250`),
       kommoFetchLeads(subdomain, safeToken, `/leads?filter[statuses][0][pipeline_id]=${pid}&filter[statuses][0][status_id]=142`),
@@ -388,7 +390,7 @@ export async function POST(req: NextRequest) {
 
     // Revenue won month
     const revenueWonMonth = wonAllLeads
-      .filter(l => l.closed_at && l.closed_at >= monthTs)
+      .filter(l => l.closed_at && l.closed_at >= realMonthTs)
       .reduce((s, l) => s + (l.price || 0), 0);
 
     // === LOTE 5: Funil Follow Up ===
@@ -439,7 +441,7 @@ export async function POST(req: NextRequest) {
     if (pacientesPipeline) {
       // Churn = perdidos no pacientes no último mês
       const churnRes = await kommoFetch(subdomain, safeToken,
-        `/leads?filter[statuses][0][pipeline_id]=${pacientesPipeline.id}&filter[statuses][0][status_id]=143&filter[closed_at][from]=${monthTs}&filter[closed_at][to]=${ts}&limit=250`
+        `/leads?filter[statuses][0][pipeline_id]=${pacientesPipeline.id}&filter[statuses][0][status_id]=143&filter[closed_at][from]=${realMonthTs}&filter[closed_at][to]=${ts}&limit=250`
       ).catch(() => ({}));
       churn = (churnRes as any)?._embedded?.leads?.length || 0;
       await delay(150);
@@ -522,7 +524,7 @@ export async function POST(req: NextRequest) {
         revenue: revenueWonWeek,
       },
       month: {
-        leads: (monthRes._embedded?.leads || []).length,
+        leads: monthData.count,
         revenue: revenueWonMonth,
       },
       contacts: {
