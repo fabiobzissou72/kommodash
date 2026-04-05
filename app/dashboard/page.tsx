@@ -270,10 +270,21 @@ export default function Dashboard() {
 
             {/* Row 1 — Leads por período */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <StatCard label="Leads hoje" value={data.leads_hoje} accent="cyan" icon="📥" sub="novos contatos hoje" />
-              <StatCard label="Esta semana" value={data.leads_semana} accent="purple" icon="📅" sub="desde segunda-feira" />
-              <StatCard label={dateFrom ? "No período" : "Este mês"} value={data.leads_mes} accent="orange" icon="📆"
-                sub={dateFrom ? `${dateFrom} → ${dateTo||"hoje"}` : "mês atual"} />
+              {dateFrom ? (
+                <StatCard label="Leads no período" value={data.leads_mes} accent="cyan" icon="📥" sub={`${dateFrom} → ${dateTo||"hoje"}`} />
+              ) : (
+                <StatCard label="Leads hoje" value={data.leads_hoje} accent="cyan" icon="📥" sub="novos contatos hoje" />
+              )}
+              {dateFrom ? (
+                <StatCard label="Pacientes no período" value={data.total_pacientes} accent="purple" icon="👥" sub="RD Station filtrado" />
+              ) : (
+                <StatCard label="Esta semana" value={data.leads_semana} accent="purple" icon="📅" sub="desde segunda-feira" />
+              )}
+              {dateFrom ? (
+                <StatCard label="Faturamento no período" value={BRL(data.fin_faturamento_total)} accent="green" icon="💰" sub={`${dateFrom} → ${dateTo||"hoje"}`} />
+              ) : (
+                <StatCard label="Este mês" value={data.leads_mes} accent="orange" icon="📆" sub="mês atual" />
+              )}
             </div>
 
             {/* Row 2 — KPIs */}
