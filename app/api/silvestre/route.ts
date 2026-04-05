@@ -90,14 +90,16 @@ export async function GET(req: NextRequest) {
       { data: leadsLast30 },
       { data: convStages },
       { data: fupTracking },
+      { data: humanosData },
     ] = await Promise.all([
       sb.from("dados_cliente").select("*", { count: "exact", head: true }),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", todayStr),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", weekStr),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", monthStr).lte("created_at", monthEnd),
       sb.from("dados_cliente").select("created_at").gte("created_at", thirtyDaysAgo),
-      sb.from("nsf_conversations").select("current_stage, created_at"),
+      sb.from("nsf_conversations").select("phone, current_stage, created_at"),
       sb.from("follow_up_tracking").select("status, follow_up_count"),
+      sb.from("dados_cliente").select("telefone").eq("humano", true),
     ]);
 
     // Stage distribution
@@ -109,12 +111,25 @@ export async function GET(req: NextRequest) {
 
     const totalConvs = convStages?.length || 0;
 
+    // Mapa de stage por telefone (para cruzar com humano=true)
+    const stageByPhone: Record<string, number> = {};
+    (convStages || []).forEach((c: any) => {
+      if (c.phone) stageByPhone[c.phone] = Number(c.current_stage) || 1;
+    });
+
+    // Humano real: dados_cliente.humano=true excluindo stages 100/101/102
+    const humanosPhones = (humanosData || []).map((r: any) => r.telefone);
+    const countHumanoReal = humanosPhones.filter((tel: string) => {
+      const s = stageByPhone[tel];
+      return s === undefined || (s !== 100 && s !== 101 && s !== 102);
+    }).length;
+
     // Funil de atendimento
     const funnelEtapas = [
       { name: "Contato Inicial", count: stageMap[1] || 0 },
       { name: "IA Respondeu", count: (stageMap[2]||0)+(stageMap[3]||0)+(stageMap[4]||0)+(stageMap[5]||0) },
       { name: "IA Concluiu", count: stageMap[6] || 0 },
-      { name: "Humano", count: stageMap[99] || 0 },
+      { name: "Humano", count: countHumanoReal },
       { name: "Lead Quente", count: stageMap[100] || 0 },
       { name: "Ag. Pagamento", count: stageMap[101] || 0 },
       { name: "Respondido", count: stageMap[102] || 0 },
