@@ -42,6 +42,14 @@ export async function GET(req: NextRequest) {
     .select("*", { count: "exact", head: true });
   results.supabase_followup = e4 ? `error: ${e4.message}` : (fupCount ?? 0);
 
+  // nsf_messages — verificar se tem stage preenchido
+  const { data: msgSample } = await sb
+    .from("nsf_messages")
+    .select("phone, role, stage, created_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
+  results.nsf_messages_sample = JSON.stringify((msgSample || []).map((m: any) => ({ role: m.role, stage: m.stage })));
+
   // RD Station
   try {
     const rdRes = await fetch(
