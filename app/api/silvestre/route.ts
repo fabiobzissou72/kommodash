@@ -285,6 +285,32 @@ export async function GET(req: NextRequest) {
       return { month: label, value: finFatHistMap[key]||0 };
     });
 
+    // Faturamento por semana do mês atual (para gráfico meta semanal)
+    const nowDate = new Date();
+    const firstOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
+    const lastOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 0);
+    const finFatSemanal: { label: string; start: string; end: string; valor: number }[] = [];
+    let wkStart = new Date(firstOfMonth);
+    let wkNum = 1;
+    while (wkStart <= lastOfMonth) {
+      const wkEnd = new Date(wkStart);
+      wkEnd.setDate(wkEnd.getDate() + 6);
+      if (wkEnd > lastOfMonth) wkEnd.setTime(lastOfMonth.getTime());
+      const startStr = wkStart.toISOString().slice(0,10);
+      const endStr = wkEnd.toISOString().slice(0,10);
+      const endDay = wkEnd.getDate();
+      const startDay = wkStart.getDate();
+      const monthAbrev = nowDate.toLocaleDateString("pt-BR",{month:"short"});
+      const label = `Sem ${wkNum} (${String(startDay).padStart(2,"0")}-${String(endDay).padStart(2,"0")}/${monthAbrev})`;
+      const valor = pacientesDeals
+        .filter((d:any) => { const dc=(d.created_at||"").slice(0,10); return dc>=startStr && dc<=endStr; })
+        .reduce((s:number,d:any) => s+(d.amount_total||0), 0);
+      finFatSemanal.push({ label, start: startStr, end: endStr, valor });
+      wkStart = new Date(wkEnd); wkStart.setDate(wkStart.getDate()+1);
+      wkNum++;
+    }
+    const diasNoMes = lastOfMonth.getDate();
+
     const taxaConversao = (totalLeads||0) > 0 ? Math.round((totalPacientes/(totalLeads||1))*100) : 0;
     const vendasHoje = hasFilter
       ? pacientesFiltered.length
@@ -350,6 +376,8 @@ export async function GET(req: NextRequest) {
       fin_renov_90_365: 0,
       fin_churn: 0,
       fin_faturamento_historico: finFatHistorico,
+      fin_faturamento_semanal: finFatSemanal,
+      fin_dias_no_mes: diasNoMes,
       fin_mix_planos: [
         { plano: "Trimestral", count: finTrimestralCount, valor: finTrimestralValor },
         { plano: "Semestral", count: finSemestralCount, valor: finSemestralValor },

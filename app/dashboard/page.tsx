@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell, Legend,
+  LineChart, Line, PieChart, Pie, Cell, Legend, ReferenceLine,
 } from "recharts";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -52,6 +52,8 @@ type SilvestreData = {
   fin_renov_90_365: number;
   fin_churn: number;
   fin_faturamento_historico: { month: string; value: number }[];
+  fin_faturamento_semanal: { label: string; start: string; end: string; valor: number }[];
+  fin_dias_no_mes: number;
   fin_mix_planos: { plano: string; count: number; valor: number }[];
   total_pacientes: number;
 };
@@ -939,6 +941,51 @@ export default function Dashboard() {
                 </>
               )}
             </div>
+
+            {/* Meta semanal */}
+            {meta > 0 && data.fin_faturamento_semanal?.length > 0 && (() => {
+              const semanas = data.fin_faturamento_semanal;
+              const metaSemanal = Math.round(meta / semanas.length);
+              const metaDiaria = Math.round(meta / data.fin_dias_no_mes);
+              const totalRealizado = semanas.reduce((s,w)=>s+w.valor,0);
+              return (
+                <PanelCard title="Meta semanal — realizado vs meta" icon="📊">
+                  <div className="flex gap-4 mb-3">
+                    <div className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 text-center">
+                      <p className="text-xs text-muted-foreground">Meta semanal</p>
+                      <p className="text-base font-bold text-cyan-400">{BRL(metaSemanal)}</p>
+                    </div>
+                    <div className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 text-center">
+                      <p className="text-xs text-muted-foreground">Meta diária</p>
+                      <p className="text-base font-bold text-purple-400">{BRL(metaDiaria)}</p>
+                    </div>
+                    <div className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 text-center">
+                      <p className="text-xs text-muted-foreground">Realizado mês</p>
+                      <p className={`text-base font-bold ${totalRealizado>=meta?"text-emerald-400":"text-amber-400"}`}>{BRL(totalRealizado)}</p>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={semanas} margin={{top:5,right:10,left:-10,bottom:40}}>
+                      <XAxis dataKey="label" tick={{fontSize:9}} stroke="hsl(var(--muted-foreground))" angle={-20} textAnchor="end" interval={0} />
+                      <YAxis tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))"
+                        tickFormatter={(v:number)=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)} />
+                      <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle}
+                        formatter={(v:number)=>[BRL(v),"Realizado"]} />
+                      <ReferenceLine y={metaSemanal} stroke="#06b6d4" strokeDasharray="4 3"
+                        label={{value:`Meta ${BRL(metaSemanal)}`,fill:"#06b6d4",fontSize:10,position:"insideTopRight"}} />
+                      <Bar dataKey="valor" name="Realizado" radius={[6,6,0,0]}>
+                        {semanas.map((w,i)=>(
+                          <Cell key={i} fill={w.valor>=metaSemanal?"#10b981":"#f59e0b"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <p className="text-xs text-muted-foreground text-center mt-1">
+                    🟢 Meta batida · 🟡 Abaixo da meta · Linha azul = meta semanal
+                  </p>
+                </PanelCard>
+              );
+            })()}
 
             {/* Gráficos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
