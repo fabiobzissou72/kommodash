@@ -35,6 +35,45 @@ async function getAllRdDeals(pipelineId: string): Promise<any[]> {
   return deals;
 }
 
+// Cálculo da Páscoa (algoritmo de Butcher)
+function getEaster(year: number): Date {
+  const a = year % 19, b = Math.floor(year/100), c = year % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15) % 30;
+  const i = Math.floor(c/4), k = c % 4;
+  const l = (32+2*e+2*i-h-k) % 7;
+  const m = Math.floor((a+11*h+22*l)/451);
+  const month = Math.floor((h+l-7*m+114)/31);
+  const day = ((h+l-7*m+114) % 31) + 1;
+  return new Date(year, month-1, day);
+}
+
+// Feriados nacionais brasileiros para um ano
+function getFeriados(year: number): Set<string> {
+  const fmt = (d: Date) => d.toISOString().slice(0,10);
+  const fix = (m: number, d: number) => fmt(new Date(year, m-1, d));
+
+  const pascoa = getEaster(year);
+  const addDays = (d: Date, n: number) => { const r=new Date(d); r.setDate(r.getDate()+n); return r; };
+
+  return new Set([
+    fix(1,1),   // Confraternização Universal
+    fmt(addDays(pascoa,-48)), // Segunda de Carnaval
+    fmt(addDays(pascoa,-47)), // Terça de Carnaval
+    fmt(addDays(pascoa,-2)),  // Sexta-feira Santa
+    fmt(pascoa),              // Páscoa
+    fix(4,21),  // Tiradentes
+    fix(5,1),   // Dia do Trabalho
+    fmt(addDays(pascoa,60)),  // Corpus Christi
+    fix(9,7),   // Independência
+    fix(10,12), // Nossa Senhora Aparecida
+    fix(11,2),  // Finados
+    fix(11,15), // Proclamação da República
+    fix(11,20), // Consciência Negra
+    fix(12,25), // Natal
+  ]);
+}
+
 function startOfDay(daysAgo = 0): string {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
@@ -293,7 +332,8 @@ export async function GET(req: NextRequest) {
     const lastOfMonth = new Date(yr, mo + 1, 0);
     const monthAbrev = nowDate.toLocaleDateString("pt-BR",{month:"short"});
     const pad2 = (n:number) => String(n).padStart(2,"0");
-    const isUtil = (d:Date) => { const dw=d.getDay(); return dw!==0&&dw!==6; };
+    const feriados = getFeriados(yr);
+    const isUtil = (d:Date) => { const dw=d.getDay(); return dw!==0&&dw!==6&&!feriados.has(d.toISOString().slice(0,10)); };
 
     // Encontrar a Segunda-feira da semana que contém o dia 1 do mês
     const firstDow = firstOfMonth.getDay(); // 0=dom,1=seg,...
@@ -337,13 +377,12 @@ export async function GET(req: NextRequest) {
       curMon = new Date(curFri); curMon.setDate(curMon.getDate()+3);
     }
 
-    // Dias úteis restantes no mês (de hoje até o fim do mês)
+    // Dias úteis restantes no mês (de hoje até o fim, excluindo feriados)
     let diasUteisRestantes = 0;
     const todayDate = new Date(); todayDate.setHours(0,0,0,0);
     const scanDay = new Date(todayDate);
     while (scanDay <= lastOfMonth) {
-      const dw = scanDay.getDay();
-      if (dw !== 0 && dw !== 6) diasUteisRestantes++;
+      if (isUtil(scanDay)) diasUteisRestantes++;
       scanDay.setDate(scanDay.getDate()+1);
     }
 
