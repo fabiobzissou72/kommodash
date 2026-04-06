@@ -887,7 +887,7 @@ export default function Dashboard() {
               <StatCard label="Faturamento total" value={BRL(data.fin_faturamento_total)} accent="green" icon="💵" sub="pacientes ativos" />
               <StatCard label="MRR estimado" value={BRL(data.fin_mrr)} accent="cyan" icon="📅" sub="recorrência mensal" />
               <StatCard label="Ticket médio" value={BRL(data.fin_ticket_medio)} accent="purple" icon="🎫" sub="por paciente" />
-              <StatCard label="Total pacientes" value={data.total_pacientes} accent="orange" icon="👥" sub="pacientes ativos" />
+              <StatCard label="Taxa de churn" value={`${data.fin_churn}%`} accent="red" icon="📉" sub="cancelamentos" />
             </div>
 
             {/* Row 2 — planos e LTV */}
@@ -997,13 +997,13 @@ export default function Dashboard() {
             </div>
 
             {/* Renovações */}
-            <PanelCard title="Renovações por faixa (aguarda campos de data no RD Station)" icon="🔄">
+            <PanelCard title="Renovações por faixa de vencimento" icon="🔄">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { label:"Até 30 dias", value:data.fin_renov_ate_30, color:"text-rose-400" },
-                  { label:"30 a 60 dias", value:data.fin_renov_30_60, color:"text-amber-400" },
-                  { label:"60 a 90 dias", value:data.fin_renov_60_90, color:"text-yellow-400" },
-                  { label:"90 a 365 dias", value:data.fin_renov_90_365, color:"text-emerald-400" },
+                  { label:"Até 1 mês", value:data.fin_renov_ate_30, color:"text-rose-400" },
+                  { label:"1 a 2 meses", value:data.fin_renov_30_60, color:"text-amber-400" },
+                  { label:"2 a 3 meses", value:data.fin_renov_60_90, color:"text-yellow-400" },
+                  { label:"3 a 12 meses", value:data.fin_renov_90_365, color:"text-emerald-400" },
                 ].map((r,i)=>(
                   <div key={i} className="rounded-lg border border-border bg-secondary/50 p-4 text-center">
                     <p className={`text-3xl font-bold ${r.color}`}>{r.value}</p>
@@ -1012,7 +1012,7 @@ export default function Dashboard() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-3 text-center">
-                Para ativar renovações, adicione os campos "Data início" e "Data fim" no RD Station CRM
+                Ative adicionando os campos <strong>Data início</strong> e <strong>Data fim</strong> no RD Station CRM (pipeline Pacientes Ativos)
               </p>
             </PanelCard>
 
