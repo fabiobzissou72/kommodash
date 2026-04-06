@@ -336,6 +336,16 @@ export async function GET(req: NextRequest) {
       curMon = new Date(curFri); curMon.setDate(curMon.getDate()+3);
     }
 
+    // Dias úteis restantes no mês (de hoje até o fim do mês)
+    let diasUteisRestantes = 0;
+    const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+    const scanDay = new Date(todayDate);
+    while (scanDay <= lastOfMonth) {
+      const dw = scanDay.getDay();
+      if (dw !== 0 && dw !== 6) diasUteisRestantes++;
+      scanDay.setDate(scanDay.getDate()+1);
+    }
+
     const taxaConversao = (totalLeads||0) > 0 ? Math.round((totalPacientes/(totalLeads||1))*100) : 0;
     const vendasHoje = hasFilter
       ? pacientesFiltered.length
@@ -403,6 +413,7 @@ export async function GET(req: NextRequest) {
       fin_faturamento_historico: finFatHistorico,
       fin_faturamento_semanal: finFatSemanal,
       fin_dias_uteis_mes: totalDiasUteis,
+      fin_dias_uteis_restantes: diasUteisRestantes,
       fin_mix_planos: [
         { plano: "Trimestral", count: finTrimestralCount, valor: finTrimestralValor },
         { plano: "Semestral", count: finSemestralCount, valor: finSemestralValor },
