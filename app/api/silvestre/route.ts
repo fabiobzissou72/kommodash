@@ -133,6 +133,7 @@ export async function GET(req: NextRequest) {
       { data: humanosData },
       { data: bugsData },
       { data: messagesData },
+      { data: feriadosLocaisData },
     ] = await Promise.all([
       sb.from("dados_cliente").select("*", { count: "exact", head: true }),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", todayStr),
@@ -146,6 +147,7 @@ export async function GET(req: NextRequest) {
       sb.from("dados_cliente").select("telefone").eq("humano", true),
       sb.from("bug_ia").select("id, created_at, stage, resolved").order("created_at", { ascending: false }),
       sb.from("nsf_messages").select("phone, role, stage, created_at").gte("created_at", startOfDay(30)).order("phone").order("created_at", { ascending: true }),
+      sb.from("feriados_locais").select("data"),
     ]);
 
     // Tempo médio da IA: primeira msg do lead (stage 1) → última msg "ai" no stage 6
@@ -333,7 +335,8 @@ export async function GET(req: NextRequest) {
     const monthAbrev = nowDate.toLocaleDateString("pt-BR",{month:"short"});
     const pad2 = (n:number) => String(n).padStart(2,"0");
     const feriados = getFeriados(yr);
-    const isUtil = (d:Date) => { const dw=d.getDay(); return dw!==0&&dw!==6&&!feriados.has(d.toISOString().slice(0,10)); };
+    const feriadosLocaisSet = new Set<string>((feriadosLocaisData||[]).map((f:any)=>f.data));
+    const isUtil = (d:Date) => { const dw=d.getDay(), iso=d.toISOString().slice(0,10); return dw!==0&&dw!==6&&!feriados.has(iso)&&!feriadosLocaisSet.has(iso); };
 
     // Encontrar a Segunda-feira da semana que contém o dia 1 do mês
     const firstDow = firstOfMonth.getDay(); // 0=dom,1=seg,...

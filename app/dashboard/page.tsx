@@ -86,6 +86,25 @@ type KommoData = {
   faturamento_historico: { month: string; value: number }[];
 };
 
+// ─── Feriados nacionais (client-side) ────────────────────────
+function getEasterCli(y: number): Date {
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4;
+  const l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const mo=Math.floor((h+l-7*m+114)/31),dy=((h+l-7*m+114)%31)+1;
+  return new Date(y,mo-1,dy);
+}
+function feriadosNacionaisSet(year: number): Set<string> {
+  const fmt=(d:Date)=>d.toISOString().slice(0,10);
+  const fix=(m:number,d:number)=>fmt(new Date(year,m-1,d));
+  const p=getEasterCli(year);
+  const add=(d:Date,n:number)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
+  return new Set([
+    fix(1,1),fmt(add(p,-48)),fmt(add(p,-47)),fmt(add(p,-2)),fmt(p),
+    fix(4,21),fix(5,1),fmt(add(p,60)),fix(9,7),fix(10,12),fix(11,2),fix(11,15),fix(11,20),fix(12,25),
+  ]);
+}
+
 // ─── Utils ───────────────────────────────────────────────────
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
 const COLORS = ["#00d9f5","#00e5a0","#fbbf24","#f43f5e","#a78bfa","#fb923c","#34d399","#e879f9","#84cc16","#38bdf8"];
@@ -323,6 +342,12 @@ export default function Dashboard() {
   const [bugDesc, setBugDesc] = useState("");
   const [bugSaving, setBugSaving] = useState(false);
 
+  // ── Feriados locais ──
+  const [feriadosLocais, setFeriadosLocais] = useState<{id:string;data:string;nome:string}[]>([]);
+  const [novoFerData, setNovoFerData] = useState("");
+  const [novoFerNome, setNovoFerNome] = useState("");
+  const [feriadoSaving, setFeriadoSaving] = useState(false);
+
   useEffect(() => {
     const saved = localStorage.getItem("dash_meta_mensal");
     if (saved && Number(saved) > 0) { setMeta(Number(saved)); setMetaInput(saved); }
@@ -378,7 +403,37 @@ export default function Dashboard() {
     finally { setKommoLoading(false); }
   }, [router]);
 
-  useEffect(() => { fetchData(); fetchAccounts(); }, [fetchData, fetchAccounts]);
+  const fetchFeriados = useCallback(async () => {
+    try {
+      const res = await fetch("/api/feriados");
+      if (res.ok) { const j = await res.json(); setFeriadosLocais(j || []); }
+    } catch { /* silent */ }
+  }, []);
+
+  async function addFeriado() {
+    if (!novoFerData || !novoFerNome) return;
+    setFeriadoSaving(true);
+    try {
+      await fetch("/api/feriados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: novoFerData, nome: novoFerNome }),
+      });
+      setNovoFerData(""); setNovoFerNome("");
+      await fetchFeriados();
+    } finally { setFeriadoSaving(false); }
+  }
+
+  async function deleteFeriado(id: string) {
+    await fetch("/api/feriados", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    await fetchFeriados();
+  }
+
+  useEffect(() => { fetchData(); fetchAccounts(); fetchFeriados(); }, [fetchData, fetchAccounts, fetchFeriados]);
   useEffect(() => { if (selectedAccount) fetchKommoData(selectedAccount); }, [selectedAccount, fetchKommoData]);
   useEffect(() => {
     const interval = setInterval(() => fetchData(dateFrom, dateTo), REFRESH_INTERVAL * 1000);
@@ -618,6 +673,7 @@ export default function Dashboard() {
                 const cells: (number|null)[] = Array(firstDay).fill(null);
                 for(let d=1;d<=daysInMonth;d++) cells.push(d);
                 while(cells.length%7!==0) cells.push(null);
+                const holSet = new Set([...feriadosNacionaisSet(yr), ...feriadosLocais.map(f=>f.data)]);
 
                 const selectDay = (day: number) => {
                   const iso = `${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
@@ -657,11 +713,13 @@ export default function Dashboard() {
                         const isTo = iso === dateTo;
                         const inRange = dateFrom && dateTo && iso > dateFrom && iso < dateTo;
                         const isToday = iso === today;
+                        const isFeriado = holSet.has(iso);
                         return (
-                          <button key={i} onClick={()=>selectDay(day)}
+                          <button key={i} onClick={()=>selectDay(day)} title={isFeriado ? "Feriado" : undefined}
                             className={`w-full aspect-square rounded-lg text-xs font-medium transition-all
                               ${isFrom||isTo ? "bg-cyan-500 text-white" :
                                 inRange ? "bg-cyan-500/20 text-cyan-400" :
+                                isFeriado ? "bg-rose-500/20 text-rose-400 font-bold" :
                                 isToday ? "bg-secondary text-cyan-400 font-bold" :
                                 "text-foreground hover:bg-secondary"}`}>
                             {day}
@@ -670,9 +728,12 @@ export default function Dashboard() {
                       })}
                     </div>
 
-                    <p className="text-[10px] text-muted-foreground text-center mt-3">
-                      Selecionando: <span className="text-cyan-400 font-medium">{showCal==="from"?"data inicial":"data final"}</span>
-                    </p>
+                    <div className="flex items-center justify-between mt-3">
+                      <p className="text-[10px] text-muted-foreground">
+                        Selecionando: <span className="text-cyan-400 font-medium">{showCal==="from"?"data inicial":"data final"}</span>
+                      </p>
+                      <p className="text-[10px] text-rose-400">● feriado</p>
+                    </div>
                   </div>
                 );
               })()}
@@ -1041,6 +1102,7 @@ export default function Dashboard() {
                 const cells:(number|null)[]=Array(firstDay).fill(null);
                 for(let d=1;d<=daysInMonth;d++) cells.push(d);
                 while(cells.length%7!==0) cells.push(null);
+                const holSet2=new Set([...feriadosNacionaisSet(yr),...feriadosLocais.map(f=>f.data)]);
                 const selectDay=(day:number)=>{ const iso=`${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`; if(showCal==="from"){setDateFrom(iso);setShowCal(null);}else{setDateTo(iso);setShowCal(null);} };
                 const dayStr=(day:number)=>`${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
                 return (
@@ -1052,9 +1114,12 @@ export default function Dashboard() {
                     </div>
                     <div className="grid grid-cols-7 mb-1">{["D","S","T","Q","Q","S","S"].map((d,i)=><div key={i} className="text-center text-[10px] font-semibold text-muted-foreground py-1">{d}</div>)}</div>
                     <div className="grid grid-cols-7 gap-0.5">
-                      {cells.map((day,i)=>{ if(!day) return <div key={i}/>; const iso=dayStr(day); const isFrom=iso===dateFrom; const isTo=iso===dateTo; const inRange=dateFrom&&dateTo&&iso>dateFrom&&iso<dateTo; const isToday=iso===today; return (<button key={i} onClick={()=>selectDay(day)} className={`w-full aspect-square rounded-lg text-xs font-medium transition-all ${isFrom||isTo?"bg-cyan-500 text-white":inRange?"bg-cyan-500/20 text-cyan-400":isToday?"bg-secondary text-cyan-400 font-bold":"text-foreground hover:bg-secondary"}`}>{day}</button>); })}
+                      {cells.map((day,i)=>{ if(!day) return <div key={i}/>; const iso=dayStr(day); const isFrom=iso===dateFrom; const isTo=iso===dateTo; const inRange=dateFrom&&dateTo&&iso>dateFrom&&iso<dateTo; const isToday=iso===today; const isFer=holSet2.has(iso); return (<button key={i} onClick={()=>selectDay(day)} title={isFer?"Feriado":undefined} className={`w-full aspect-square rounded-lg text-xs font-medium transition-all ${isFrom||isTo?"bg-cyan-500 text-white":inRange?"bg-cyan-500/20 text-cyan-400":isFer?"bg-rose-500/20 text-rose-400 font-bold":isToday?"bg-secondary text-cyan-400 font-bold":"text-foreground hover:bg-secondary"}`}>{day}</button>); })}
                     </div>
-                    <p className="text-[10px] text-muted-foreground text-center mt-3">Selecionando: <span className="text-cyan-400 font-medium">{showCal==="from"?"data inicial":"data final"}</span></p>
+                    <div className="flex items-center justify-between mt-3">
+                      <p className="text-[10px] text-muted-foreground">Selecionando: <span className="text-cyan-400 font-medium">{showCal==="from"?"data inicial":"data final"}</span></p>
+                      <p className="text-[10px] text-rose-400">● feriado</p>
+                    </div>
                   </div>
                 );
               })()}
@@ -1279,6 +1344,83 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground mt-3 text-center">
                 Ative adicionando os campos <strong>Data início</strong> e <strong>Data fim</strong> no RD Station CRM (pipeline Pacientes Ativos)
               </p>
+            </PanelCard>
+
+            {/* Feriados */}
+            <PanelCard title="Feriados — dias não úteis" icon="📅">
+              {/* Feriados nacionais do mês atual */}
+              {(() => {
+                const now = new Date();
+                const yr = now.getFullYear(), mo = now.getMonth();
+                const prefix = `${yr}-${String(mo+1).padStart(2,"0")}`;
+                const nomeFeriado: Record<string,string> = {
+                  [`${yr}-01-01`]:"Confraternização Universal",
+                  [`${yr}-04-21`]:"Tiradentes",
+                  [`${yr}-05-01`]:"Dia do Trabalho",
+                  [`${yr}-09-07`]:"Independência",
+                  [`${yr}-10-12`]:"N. Sra. Aparecida",
+                  [`${yr}-11-02`]:"Finados",
+                  [`${yr}-11-15`]:"Proclamação da República",
+                  [`${yr}-11-20`]:"Consciência Negra",
+                  [`${yr}-12-25`]:"Natal",
+                };
+                const p=getEasterCli(yr);
+                const add=(d:Date,n:number)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
+                const fmt=(d:Date)=>d.toISOString().slice(0,10);
+                nomeFeriado[fmt(add(p,-48))]="Segunda de Carnaval";
+                nomeFeriado[fmt(add(p,-47))]="Terça de Carnaval";
+                nomeFeriado[fmt(add(p,-2))]="Sexta-feira Santa";
+                nomeFeriado[fmt(p)]="Páscoa";
+                nomeFeriado[fmt(add(p,60))]="Corpus Christi";
+                const feriadosMes = [...feriadosNacionaisSet(yr)].filter(d=>d.startsWith(prefix));
+                return feriadosMes.length > 0 ? (
+                  <div className="mb-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Feriados nacionais este mês</p>
+                    <div className="flex flex-wrap gap-2">
+                      {feriadosMes.map((d,i)=>(
+                        <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400">
+                          <span>{new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}</span>
+                          <span className="text-rose-400/70">{nomeFeriado[d]||""}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
+              {/* Feriados locais */}
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Feriados locais / estaduais / municipais</p>
+                <div className="space-y-1.5 mb-3">
+                  {feriadosLocais.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-2">Nenhum feriado local cadastrado</p>
+                  )}
+                  {feriadosLocais.map(f=>(
+                    <div key={f.id} className="flex items-center justify-between rounded-lg bg-secondary/50 px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium text-rose-400">
+                          {new Date(f.data+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"})}
+                        </span>
+                        <span className="text-xs text-foreground">{f.nome}</span>
+                      </div>
+                      <button onClick={()=>deleteFeriado(f.id)}
+                        className="text-muted-foreground hover:text-rose-400 transition-colors text-xs px-1">✕</button>
+                    </div>
+                  ))}
+                </div>
+                {/* Adicionar novo */}
+                <div className="flex gap-2 flex-wrap">
+                  <input type="date" value={novoFerData} onChange={e=>setNovoFerData(e.target.value)}
+                    className="h-8 px-2 rounded-lg text-xs bg-secondary border border-border outline-none focus:border-cyan-500/50" />
+                  <input value={novoFerNome} onChange={e=>setNovoFerNome(e.target.value)}
+                    placeholder="Nome do feriado"
+                    className="h-8 px-3 rounded-lg text-xs bg-secondary border border-border outline-none focus:border-cyan-500/50 flex-1 min-w-[160px]" />
+                  <button onClick={addFeriado} disabled={feriadoSaving||!novoFerData||!novoFerNome}
+                    className="h-8 px-4 rounded-lg text-xs font-medium bg-cyan-500/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/25 transition-all disabled:opacity-40">
+                    {feriadoSaving ? "..." : "Adicionar"}
+                  </button>
+                </div>
+              </div>
             </PanelCard>
 
           </div>
