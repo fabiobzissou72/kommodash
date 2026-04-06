@@ -52,8 +52,8 @@ type SilvestreData = {
   fin_renov_90_365: number;
   fin_churn: number;
   fin_faturamento_historico: { month: string; value: number }[];
-  fin_faturamento_semanal: { label: string; start: string; end: string; valor: number }[];
-  fin_dias_no_mes: number;
+  fin_faturamento_semanal: { label: string; dates: string; start: string; end: string; dias_uteis: number; valor: number }[];
+  fin_dias_uteis_mes: number;
   fin_mix_planos: { plano: string; count: number; valor: number }[];
   total_pacientes: number;
 };
@@ -942,47 +942,58 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Meta semanal */}
+            {/* Meta semanal por dias úteis */}
             {meta > 0 && data.fin_faturamento_semanal?.length > 0 && (() => {
               const semanas = data.fin_faturamento_semanal;
-              const metaSemanal = Math.round(meta / semanas.length);
-              const metaDiaria = Math.round(meta / data.fin_dias_no_mes);
+              const duMes = data.fin_dias_uteis_mes || 1;
+              const metaDiaria = meta / duMes;
               const totalRealizado = semanas.reduce((s,w)=>s+w.valor,0);
+              // Montar dados para gráfico com meta proporcional aos dias úteis de cada semana
+              const chartData = semanas.map(w => ({
+                label: w.label,
+                dates: w.dates,
+                realizado: w.valor,
+                meta: Math.round(metaDiaria * w.dias_uteis),
+              }));
               return (
-                <PanelCard title="Meta semanal — realizado vs meta" icon="📊">
-                  <div className="flex gap-4 mb-3">
-                    <div className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 text-center">
-                      <p className="text-xs text-muted-foreground">Meta semanal</p>
-                      <p className="text-base font-bold text-cyan-400">{BRL(metaSemanal)}</p>
-                    </div>
-                    <div className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 text-center">
+                <PanelCard title="Meta semanal — realizado vs meta (dias úteis)" icon="📊">
+                  <div className="flex gap-3 mb-3 flex-wrap">
+                    <div className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 min-w-[100px] text-center">
                       <p className="text-xs text-muted-foreground">Meta diária</p>
-                      <p className="text-base font-bold text-purple-400">{BRL(metaDiaria)}</p>
+                      <p className="text-sm font-bold text-purple-400">{BRL(Math.round(metaDiaria))}</p>
+                      <p className="text-[10px] text-muted-foreground">{duMes} dias úteis/mês</p>
                     </div>
-                    <div className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 text-center">
-                      <p className="text-xs text-muted-foreground">Realizado mês</p>
-                      <p className={`text-base font-bold ${totalRealizado>=meta?"text-emerald-400":"text-amber-400"}`}>{BRL(totalRealizado)}</p>
-                    </div>
+                    {chartData.map((w,i)=>(
+                      <div key={i} className="rounded-lg bg-secondary/50 px-3 py-2 flex-1 min-w-[100px] text-center">
+                        <p className="text-xs text-muted-foreground font-medium">{w.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{w.dates}</p>
+                        <p className={`text-sm font-bold ${w.realizado>=w.meta?"text-emerald-400":"text-amber-400"}`}>{BRL(w.realizado)}</p>
+                        <p className="text-[10px] text-muted-foreground">meta {BRL(w.meta)}</p>
+                      </div>
+                    ))}
                   </div>
                   <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={semanas} margin={{top:5,right:10,left:-10,bottom:40}}>
-                      <XAxis dataKey="label" tick={{fontSize:9}} stroke="hsl(var(--muted-foreground))" angle={-20} textAnchor="end" interval={0} />
+                    <BarChart data={chartData} margin={{top:5,right:10,left:-10,bottom:5}}>
+                      <XAxis dataKey="label" tick={{fontSize:11}} stroke="hsl(var(--muted-foreground))" />
                       <YAxis tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))"
                         tickFormatter={(v:number)=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)} />
                       <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle}
-                        formatter={(v:number)=>[BRL(v),"Realizado"]} />
-                      <ReferenceLine y={metaSemanal} stroke="#06b6d4" strokeDasharray="4 3"
-                        label={{value:`Meta ${BRL(metaSemanal)}`,fill:"#06b6d4",fontSize:10,position:"insideTopRight"}} />
-                      <Bar dataKey="valor" name="Realizado" radius={[6,6,0,0]}>
-                        {semanas.map((w,i)=>(
-                          <Cell key={i} fill={w.valor>=metaSemanal?"#10b981":"#f59e0b"} />
+                        formatter={(v:number,n:string)=>[BRL(v), n==="realizado"?"Realizado":"Meta"]}
+                        labelFormatter={(_,p)=>p?.[0]?.payload?.dates||""} />
+                      <Bar dataKey="meta" name="meta" radius={[4,4,0,0]} fill="#374151" opacity={0.6} />
+                      <Bar dataKey="realizado" name="realizado" radius={[4,4,0,0]}>
+                        {chartData.map((w,i)=>(
+                          <Cell key={i} fill={w.realizado>=w.meta?"#10b981":"#f59e0b"} />
                         ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <p className="text-xs text-muted-foreground text-center mt-1">
-                    🟢 Meta batida · 🟡 Abaixo da meta · Linha azul = meta semanal
-                  </p>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                    <span>🟢 Meta batida · 🟡 Abaixo · ▪️ Cinza = meta da semana</span>
+                    <span className={`font-medium ${totalRealizado>=meta?"text-emerald-400":"text-amber-400"}`}>
+                      Total: {BRL(totalRealizado)} / {BRL(meta)}
+                    </span>
+                  </div>
                 </PanelCard>
               );
             })()}

@@ -285,31 +285,56 @@ export async function GET(req: NextRequest) {
       return { month: label, value: finFatHistMap[key]||0 };
     });
 
-    // Faturamento por semana do mês atual (para gráfico meta semanal)
+    // Faturamento por semana — apenas dias úteis (Seg-Sex), mês atual
     const nowDate = new Date();
-    const firstOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
-    const lastOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 0);
-    const finFatSemanal: { label: string; start: string; end: string; valor: number }[] = [];
-    let wkStart = new Date(firstOfMonth);
+    const yr = nowDate.getFullYear(), mo = nowDate.getMonth();
+    const firstOfMonth = new Date(yr, mo, 1);
+    const lastOfMonth = new Date(yr, mo + 1, 0);
+    const monthAbrev = nowDate.toLocaleDateString("pt-BR",{month:"short"});
+    const pad2 = (n:number) => String(n).padStart(2,"0");
+    const isUtil = (d:Date) => { const dw=d.getDay(); return dw!==0&&dw!==6; };
+
+    // Encontrar a Segunda-feira da semana que contém o dia 1 do mês
+    const firstDow = firstOfMonth.getDay(); // 0=dom,1=seg,...
+    const mondayOfFirst = new Date(firstOfMonth);
+    if (firstDow === 0) mondayOfFirst.setDate(mondayOfFirst.getDate()+1);
+    else if (firstDow !== 1) mondayOfFirst.setDate(mondayOfFirst.getDate()-(firstDow-1));
+
+    const finFatSemanal: { label:string; dates:string; start:string; end:string; dias_uteis:number; valor:number }[] = [];
+    let totalDiasUteis = 0;
+    let curMon = new Date(mondayOfFirst);
     let wkNum = 1;
-    while (wkStart <= lastOfMonth) {
-      const wkEnd = new Date(wkStart);
-      wkEnd.setDate(wkEnd.getDate() + 6);
-      if (wkEnd > lastOfMonth) wkEnd.setTime(lastOfMonth.getTime());
-      const startStr = wkStart.toISOString().slice(0,10);
-      const endStr = wkEnd.toISOString().slice(0,10);
-      const endDay = wkEnd.getDate();
-      const startDay = wkStart.getDate();
-      const monthAbrev = nowDate.toLocaleDateString("pt-BR",{month:"short"});
-      const label = `Sem ${wkNum} (${String(startDay).padStart(2,"0")}-${String(endDay).padStart(2,"0")}/${monthAbrev})`;
-      const valor = pacientesDeals
-        .filter((d:any) => { const dc=(d.created_at||"").slice(0,10); return dc>=startStr && dc<=endStr; })
-        .reduce((s:number,d:any) => s+(d.amount_total||0), 0);
-      finFatSemanal.push({ label, start: startStr, end: endStr, valor });
-      wkStart = new Date(wkEnd); wkStart.setDate(wkStart.getDate()+1);
-      wkNum++;
+
+    while (curMon <= lastOfMonth) {
+      const curFri = new Date(curMon); curFri.setDate(curFri.getDate()+4);
+      // Clampar ao mês
+      const wkS = curMon < firstOfMonth ? new Date(firstOfMonth) : new Date(curMon);
+      const wkE = curFri > lastOfMonth ? new Date(lastOfMonth) : new Date(curFri);
+      if (wkS > lastOfMonth) break;
+
+      // Contar dias úteis na semana
+      let du = 0;
+      const dc = new Date(wkS);
+      while (dc <= wkE) { if (isUtil(dc)) du++; dc.setDate(dc.getDate()+1); }
+
+      if (du > 0) {
+        totalDiasUteis += du;
+        const startStr = wkS.toISOString().slice(0,10);
+        const endStr = wkE.toISOString().slice(0,10);
+        const valor = pacientesDeals
+          .filter((d:any)=>{ const dstr=(d.created_at||"").slice(0,10); return dstr>=startStr&&dstr<=endStr; })
+          .reduce((s:number,d:any)=>s+(d.amount_total||0),0);
+        finFatSemanal.push({
+          label: `Sem ${wkNum}`,
+          dates: `${pad2(wkS.getDate())} a ${pad2(wkE.getDate())}/${monthAbrev}`,
+          start: startStr, end: endStr,
+          dias_uteis: du, valor,
+        });
+        wkNum++;
+      }
+      // Próxima segunda
+      curMon = new Date(curFri); curMon.setDate(curMon.getDate()+3);
     }
-    const diasNoMes = lastOfMonth.getDate();
 
     const taxaConversao = (totalLeads||0) > 0 ? Math.round((totalPacientes/(totalLeads||1))*100) : 0;
     const vendasHoje = hasFilter
@@ -377,7 +402,7 @@ export async function GET(req: NextRequest) {
       fin_churn: 0,
       fin_faturamento_historico: finFatHistorico,
       fin_faturamento_semanal: finFatSemanal,
-      fin_dias_no_mes: diasNoMes,
+      fin_dias_uteis_mes: totalDiasUteis,
       fin_mix_planos: [
         { plano: "Trimestral", count: finTrimestralCount, valor: finTrimestralValor },
         { plano: "Semestral", count: finSemestralCount, valor: finSemestralValor },
