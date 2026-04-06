@@ -120,11 +120,12 @@ export async function GET(req: NextRequest) {
         byPhone[m.phone].push({ role: m.role, stage: Number(m.stage) || 1, created_at: m.created_at });
       });
       Object.values(byPhone).forEach((msgs) => {
-        // Só calcula para leads que chegaram ao stage 6
-        const lastStage6Ai = [...msgs].reverse().find(m => m.role === "ai" && m.stage === 6);
-        if (!lastStage6Ai) return;
+        // Stage fica nas msgs do cliente (não na IA que tem stage=null)
+        // Procura a última mensagem do cliente no stage 6
+        const lastStage6 = [...msgs].reverse().find(m => m.stage === 6);
+        if (!lastStage6) return;
         const firstMsg = msgs[0];
-        const diffMs = new Date(lastStage6Ai.created_at).getTime() - new Date(firstMsg.created_at).getTime();
+        const diffMs = new Date(lastStage6.created_at).getTime() - new Date(firstMsg.created_at).getTime();
         // Ignora negativos ou conversas > 4h (outliers)
         if (diffMs > 0 && diffMs < 14_400_000) diffs.push(diffMs);
       });
