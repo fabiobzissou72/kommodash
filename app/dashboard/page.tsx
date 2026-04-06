@@ -657,12 +657,10 @@ export default function Dashboard() {
                 className="h-8 px-4 rounded-lg text-xs font-medium bg-cyan-500/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/25 transition-all">
                 Aplicar
               </button>
-              {(dateFrom||dateTo) && (
-                <button onClick={()=>{ setDateFrom(""); setDateTo(""); setShowCal(null); fetchData(); }}
-                  className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-rose-400 border border-border hover:border-rose-500/30 transition-all">
-                  Limpar
-                </button>
-              )}
+              <button onClick={()=>{ setDateFrom(""); setDateTo(""); setShowCal(null); fetchData(); }}
+                className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-rose-400 border border-border hover:border-rose-500/30 transition-all">
+                Limpar
+              </button>
 
               {/* Popup calendário */}
               {showCal && (() => {
@@ -1087,12 +1085,10 @@ export default function Dashboard() {
                 className="h-8 px-4 rounded-lg text-xs font-medium bg-cyan-500/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/25 transition-all">
                 Aplicar
               </button>
-              {(dateFrom||dateTo) && (
-                <button onClick={()=>{ setDateFrom(""); setDateTo(""); setShowCal(null); fetchData(); }}
-                  className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-rose-400 border border-border hover:border-rose-500/30 transition-all">
-                  Limpar
-                </button>
-              )}
+              <button onClick={()=>{ setDateFrom(""); setDateTo(""); setShowCal(null); fetchData(); }}
+                className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-rose-400 border border-border hover:border-rose-500/30 transition-all">
+                Limpar
+              </button>
               {/* Popup calendário */}
               {showCal && tab==="financeiro" && (() => {
                 const yr=calMonth.getFullYear(), mo=calMonth.getMonth();
