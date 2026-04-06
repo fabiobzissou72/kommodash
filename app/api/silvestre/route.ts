@@ -98,9 +98,7 @@ export async function GET(req: NextRequest) {
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", weekStr),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", periodStart).lte("created_at", periodEnd),
       sb.from("dados_cliente").select("created_at").gte("created_at", chartStart).lte("created_at", periodEnd),
-      hasFilter
-        ? sb.from("nsf_conversations").select("phone, current_stage, created_at").gte("created_at", periodStart).lte("created_at", periodEnd)
-        : sb.from("nsf_conversations").select("phone, current_stage, created_at"),
+      sb.from("nsf_conversations").select("phone, current_stage, created_at"),
       hasFilter
         ? sb.from("follow_up_tracking").select("status, follow_up_count").gte("created_at", periodStart).lte("created_at", periodEnd)
         : sb.from("follow_up_tracking").select("status, follow_up_count"),
@@ -269,6 +267,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       // Funil
+      tempo_medio_resposta: 0, // TODO: calcular de n8n_chat_histories
       leads_hoje: leadsHoje ?? 0,
       leads_semana: leadsSemana ?? 0,
       leads_mes: leadsMes ?? 0,

@@ -20,6 +20,7 @@ type SilvestreData = {
   total_conversas: number;
   funil_etapas: { name: string; count: number }[];
   leads_por_dia: { date: string; count: number }[];
+  tempo_medio_resposta: number;
   // IA
   ia_taxa_conclusao: number;
   ia_handoff_humano: number;
@@ -596,7 +597,9 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground mt-2">pacientes / total leads</p>
               </div>
 
-              <StatCard label="Total de leads" value={data.total_leads} accent="default" icon="👥" sub={`${data.total_conversas} conversas ativas`} />
+              <StatCard label="Tempo médio de resposta"
+                value={data.tempo_medio_resposta > 0 ? `${data.tempo_medio_resposta}min` : "--"}
+                accent="purple" icon="⏱️" sub="tempo médio bot responder" />
             </div>
 
             {/* Gráficos */}
