@@ -823,6 +823,25 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </PanelCard>
 
+            {/* Conversões por FUP */}
+            <PanelCard title="Conversões por mensagem de Follow-up" icon="🎯">
+              {data.fup_stats.every(s=>s.conversoes===0) ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Sem conversões registradas ainda</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={data.fup_stats} margin={{top:5,right:10,left:-10,bottom:5}}>
+                    <XAxis dataKey="fup" tick={{fontSize:11}} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle}
+                      formatter={(v:number)=>[`${v} conversões`,"Conversões"]} />
+                    <Bar dataKey="conversoes" name="Conversões" radius={[6,6,0,0]}>
+                      {data.fup_stats.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </PanelCard>
+
             {/* Tabela desempenho detalhado */}
             <PanelCard title="Desempenho detalhado por mensagem" icon="📋">
               <div className="overflow-x-auto">

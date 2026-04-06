@@ -3,3 +3,9 @@
 node_modules
 
 .vercel
+.claude/
+Amanda.md
+*.docx
+*.jpeg
+*.jpg
+*.png
