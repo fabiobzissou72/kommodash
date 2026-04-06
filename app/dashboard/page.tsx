@@ -51,6 +51,33 @@ type SilvestreData = {
   total_pacientes: number;
 };
 
+// ─── Account / Kommo types ───────────────────────────────────
+type Account = { id: string; label: string; subdomain: string; token: string };
+
+type KommoData = {
+  pipeline: { id: number | null; name: string };
+  pipelines: { id: number; name: string }[];
+  today: { leads: number; won: number; lost: number; revenue: number };
+  yesterday: { leads: number; won: number; lost: number };
+  week: { leads: number; revenue: number };
+  month: { leads: number; revenue: number };
+  contacts: { today: number; week: number };
+  funnel: { name: string; count: number; value: number; rate: number }[];
+  daily: { date: string; count: number }[];
+  totals: { won: number; lost: number; active: number; active_value: number; won_value: number };
+  conversion_rate: number;
+  avg_ticket: number;
+  avg_close_hours: number;
+  overdue_tasks: number;
+  ranking: { name: string; won: number; active: number }[];
+  top_leads: { id: number; name: string; price: number; stage: string; responsible: string }[];
+  pacientes: { total: number; revenue: number; trimestral: number; semestral: number; pipeline_name: string; mrr: number } | null;
+  fup_ativos: number; fup_expirados: number; fup_total: number; fup_conversoes: number;
+  renov_ate_30: number; renov_30_60: number; renov_60_90: number; renov_90_365: number;
+  churn: number;
+  faturamento_historico: { month: string; value: number }[];
+};
+
 // ─── Utils ───────────────────────────────────────────────────
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
 const COLORS = ["#00d9f5","#00e5a0","#fbbf24","#f43f5e","#a78bfa","#fb923c","#34d399","#e879f9","#84cc16","#38bdf8"];
@@ -111,6 +138,156 @@ function PanelCard({ title, children, icon }: { title: string; children: React.R
   );
 }
 
+function KommoView({ kd }: { kd: KommoData }) {
+  const convRate = kd.conversion_rate;
+  return (
+    <div className="space-y-5">
+      {/* Row 1 — Hoje */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Leads hoje" value={kd.today.leads} accent="cyan" icon="📥" sub="novos contatos hoje" />
+        <StatCard label="Ganhos hoje" value={kd.today.won} accent="green" icon="✅" sub="fechados hoje" />
+        <StatCard label="Receita hoje" value={BRL(kd.today.revenue)} accent="yellow" icon="💰" sub="vendas fechadas" />
+        <StatCard label="Tarefas em atraso" value={kd.overdue_tasks} accent={kd.overdue_tasks>0?"red":"green"} icon="📋" sub="pendentes" />
+      </div>
+
+      {/* Row 2 — Período */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Leads semana" value={kd.week.leads} accent="purple" icon="📅" sub="desde segunda-feira" />
+        <StatCard label="Leads mês" value={kd.month.leads} accent="orange" icon="📆" sub="mês atual" />
+        <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5">
+          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-400 to-emerald-400" />
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Taxa de conversão</p>
+          <p className={`text-3xl font-bold mb-2 ${convRate>=70?"text-emerald-400":convRate>=40?"text-amber-400":"text-rose-400"}`}>{convRate}%</p>
+          <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+            <div className={`h-full rounded-full ${convRate>=70?"bg-emerald-400":convRate>=40?"bg-amber-400":"bg-rose-400"}`} style={{width:`${Math.min(convRate,100)}%`}} />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">ganhos / (ganhos+perdidos)</p>
+        </div>
+        <StatCard label="Ticket médio" value={BRL(kd.avg_ticket)} accent="green" icon="🎯" sub={`${kd.totals.won} fechados`} />
+      </div>
+
+      {/* Funil + Pacientes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <PanelCard title="Funil por etapa" icon="📊">
+          <div className="space-y-2">
+            {[...kd.funnel].sort((a,b)=>b.count-a.count).map((stage,i)=>{
+              const maxC = Math.max(...kd.funnel.map(f=>f.count),1);
+              return (
+                <div key={i}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-medium truncate max-w-[60%]">{stage.name}</span>
+                    <span className="font-bold">{stage.count}</span>
+                  </div>
+                  <div className="w-full bg-secondary rounded h-7 overflow-hidden">
+                    <div className="h-full rounded flex items-center px-2"
+                      style={{width:`${(stage.count/maxC)*100}%`,background:COLORS[i%COLORS.length]}}>
+                      <span className="text-xs font-semibold text-background truncate">{stage.name}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {kd.funnel.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Sem dados</p>}
+          </div>
+        </PanelCard>
+
+        {kd.pacientes ? (
+          <PanelCard title={`Pacientes Ativos — ${kd.pacientes.pipeline_name}`} icon="🏥">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-secondary/50 p-4 text-center">
+                <p className="text-2xl font-bold text-cyan-400">{kd.pacientes.total}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total pacientes</p>
+              </div>
+              <div className="rounded-lg bg-secondary/50 p-4 text-center">
+                <p className="text-2xl font-bold text-emerald-400">{BRL(kd.pacientes.mrr)}</p>
+                <p className="text-xs text-muted-foreground mt-1">MRR estimado</p>
+              </div>
+              <div className="rounded-lg bg-secondary/50 p-4 text-center">
+                <p className="text-2xl font-bold text-violet-400">{kd.pacientes.trimestral}</p>
+                <p className="text-xs text-muted-foreground mt-1">Plano trimestral</p>
+              </div>
+              <div className="rounded-lg bg-secondary/50 p-4 text-center">
+                <p className="text-2xl font-bold text-amber-400">{kd.pacientes.semestral}</p>
+                <p className="text-xs text-muted-foreground mt-1">Plano semestral</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border">
+              <p className="text-xs text-muted-foreground">Faturamento total <span className="text-emerald-400 font-bold">{BRL(kd.pacientes.revenue)}</span></p>
+            </div>
+          </PanelCard>
+        ) : (
+          <PanelCard title="Follow-up" icon="📨">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-secondary/50 p-4 text-center">
+                <p className="text-2xl font-bold text-cyan-400">{kd.fup_ativos}</p>
+                <p className="text-xs text-muted-foreground mt-1">Ativos</p>
+              </div>
+              <div className="rounded-lg bg-secondary/50 p-4 text-center">
+                <p className="text-2xl font-bold text-amber-400">{kd.fup_expirados}</p>
+                <p className="text-xs text-muted-foreground mt-1">Expirados</p>
+              </div>
+              <div className="rounded-lg bg-secondary/50 p-4 text-center">
+                <p className="text-2xl font-bold text-emerald-400">{kd.fup_conversoes}</p>
+                <p className="text-xs text-muted-foreground mt-1">Conversões</p>
+              </div>
+            </div>
+          </PanelCard>
+        )}
+      </div>
+
+      {/* Leads 30 dias */}
+      <PanelCard title="Leads — últimos 30 dias" icon="📈">
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={kd.daily} margin={{top:5,right:10,left:-10,bottom:0}}>
+            <XAxis dataKey="date" tick={{fontSize:9}} stroke="hsl(var(--muted-foreground))" interval={4} />
+            <YAxis tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))" />
+            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
+            <Line type="monotone" dataKey="count" stroke="#00d9f5" strokeWidth={2} dot={false} name="Leads" />
+          </LineChart>
+        </ResponsiveContainer>
+      </PanelCard>
+
+      {/* Ranking */}
+      {kd.ranking.length > 0 && (
+        <PanelCard title="Ranking vendedores" icon="🏆">
+          <div className="space-y-2">
+            {kd.ranking.map((u,i)=>(
+              <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div className="flex items-center gap-3">
+                  <span className={`text-sm font-bold w-6 ${i===0?"text-amber-400":i===1?"text-slate-300":i===2?"text-amber-600":"text-muted-foreground"}`}>{i+1}°</span>
+                  <span className="text-sm font-medium">{u.name}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-muted-foreground">{u.active} ativos</span>
+                  <span className="text-sm font-bold text-emerald-400">{u.won} ganhos</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </PanelCard>
+      )}
+
+      {/* Faturamento histórico */}
+      {kd.faturamento_historico.some(h=>h.value>0) && (
+        <PanelCard title="Faturamento histórico — 6 meses" icon="📈">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={kd.faturamento_historico} margin={{top:5,right:10,left:-10,bottom:5}}>
+              <XAxis dataKey="month" tick={{fontSize:11}} stroke="hsl(var(--muted-foreground))" />
+              <YAxis tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))"
+                tickFormatter={(v:number)=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)} />
+              <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle}
+                formatter={(v:number)=>[BRL(v),"Faturamento"]} />
+              <Bar dataKey="value" name="Faturamento" radius={[6,6,0,0]}>
+                {kd.faturamento_historico.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </PanelCard>
+      )}
+    </div>
+  );
+}
+
 function LoadingGrid() {
   return (
     <div className="space-y-5">
@@ -134,6 +311,19 @@ export default function Dashboard() {
   const [metaSaved, setMetaSaved] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  // ── Multi-accounts ──
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [kommoData, setKommoData] = useState<KommoData | null>(null);
+  const [kommoLoading, setKommoLoading] = useState(false);
+  const [kommoError, setKommoError] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addLabel, setAddLabel] = useState("");
+  const [addSubdomain, setAddSubdomain] = useState("");
+  const [addToken, setAddToken] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("dash_meta_mensal");
@@ -165,7 +355,33 @@ export default function Dashboard() {
     finally { setLoading(false); setCountdown(REFRESH_INTERVAL); }
   }, [router]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // ── Fetch accounts list ──
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/accounts");
+      if (res.ok) { const j = await res.json(); setAccounts(j.accounts || []); }
+    } catch { /* silent */ }
+  }, []);
+
+  // ── Fetch Kommo data ──
+  const fetchKommoData = useCallback(async (acc: Account) => {
+    setKommoLoading(true); setKommoError("");
+    try {
+      const res = await fetch("/api/kommo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subdomain: acc.subdomain, token: acc.token }),
+      });
+      if (res.status === 401) { router.push("/"); return; }
+      const json = await res.json();
+      if (json.error) setKommoError(json.error);
+      else setKommoData(json);
+    } catch { setKommoError("Erro de conexão"); }
+    finally { setKommoLoading(false); }
+  }, [router]);
+
+  useEffect(() => { fetchData(); fetchAccounts(); }, [fetchData, fetchAccounts]);
+  useEffect(() => { if (selectedAccount) fetchKommoData(selectedAccount); }, [selectedAccount, fetchKommoData]);
   useEffect(() => {
     const interval = setInterval(() => fetchData(dateFrom, dateTo), REFRESH_INTERVAL * 1000);
     return () => clearInterval(interval);
@@ -174,6 +390,33 @@ export default function Dashboard() {
     const tick = setInterval(() => setCountdown(c => c <= 1 ? REFRESH_INTERVAL : c - 1), 1000);
     return () => clearInterval(tick);
   }, []);
+
+  async function saveAccount() {
+    if (!addLabel || !addSubdomain || !addToken) { setAddError("Preencha todos os campos"); return; }
+    setAddSaving(true); setAddError("");
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: addLabel, subdomain: addSubdomain, token: addToken }),
+      });
+      const j = await res.json();
+      if (!res.ok) { setAddError(j.error || "Erro ao salvar"); return; }
+      await fetchAccounts();
+      setShowAddModal(false); setAddLabel(""); setAddSubdomain(""); setAddToken("");
+    } catch { setAddError("Erro de conexão"); }
+    finally { setAddSaving(false); }
+  }
+
+  async function deleteAccount(subdomain: string) {
+    await fetch("/api/accounts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subdomain }),
+    });
+    if (selectedAccount?.subdomain === subdomain) { setSelectedAccount(null); setKommoData(null); }
+    await fetchAccounts();
+  }
 
   async function logout() { await fetch("/api/auth", { method:"DELETE" }); router.push("/"); }
 
@@ -195,6 +438,26 @@ export default function Dashboard() {
               <span className="text-[10px] text-muted-foreground leading-none mt-0.5">Dashboard</span>
             </div>
           </div>
+          {/* Account selector */}
+          <div className="flex items-center gap-2 flex-1 justify-center">
+            <button
+              onClick={() => { setSelectedAccount(null); setKommoData(null); }}
+              className={`h-8 px-3 rounded-lg text-xs font-medium border transition-all ${!selectedAccount ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}>
+              Nutri Silvestre
+            </button>
+            {accounts.map(acc => (
+              <button key={acc.id}
+                onClick={() => setSelectedAccount(acc)}
+                className={`h-8 px-3 rounded-lg text-xs font-medium border transition-all ${selectedAccount?.id === acc.id ? "bg-violet-500/15 text-violet-400 border-violet-500/25" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}>
+                {acc.label}
+              </button>
+            ))}
+            <button onClick={() => setShowAddModal(true)}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-sm bg-secondary border border-border text-muted-foreground hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
+              +
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             {loading && (
               <div className="hidden sm:flex items-center gap-1.5">
@@ -218,6 +481,36 @@ export default function Dashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-5 py-5 space-y-5">
+
+        {/* ── KOMMO ACCOUNT VIEW ── */}
+        {selectedAccount && (
+          <div>
+            {kommoError && <div className="rounded-xl border border-rose-500/30 bg-rose-500/8 text-rose-400 px-5 py-3 text-sm flex items-center gap-2 mb-4"><span>⚠</span> {kommoError}</div>}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-bold">{selectedAccount.label}</h2>
+                <p className="text-xs text-muted-foreground">{selectedAccount.subdomain}.kommo.com</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => fetchKommoData(selectedAccount)}
+                  disabled={kommoLoading}
+                  className="h-8 px-3 rounded-lg text-xs font-medium bg-secondary hover:bg-violet-500/10 hover:text-violet-400 border border-border hover:border-violet-500/30 transition-all disabled:opacity-50">
+                  {kommoLoading ? "…" : "↻ Atualizar"}
+                </button>
+                <button onClick={() => { if (confirm(`Remover conta "${selectedAccount.label}"?`)) deleteAccount(selectedAccount.subdomain); }}
+                  className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 border border-border transition-colors">
+                  Remover
+                </button>
+              </div>
+            </div>
+            {kommoLoading && !kommoData && <LoadingGrid />}
+            {kommoData && <KommoView kd={kommoData} />}
+          </div>
+        )}
+
+        {/* ── SILVESTRE VIEW ── */}
+        {!selectedAccount && (
+        <div className="space-y-5">
 
         {error && <div className="rounded-xl border border-rose-500/30 bg-rose-500/8 text-rose-400 px-5 py-3 text-sm flex items-center gap-2"><span>⚠</span> {error}</div>}
 
@@ -755,7 +1048,54 @@ export default function Dashboard() {
           </div>
         )}
 
+        </div>
+        )} {/* end !selectedAccount */}
+
       </div>
+
+      {/* ── Add Account Modal ── */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base">Adicionar conta Kommo</h3>
+              <button onClick={() => { setShowAddModal(false); setAddError(""); }} className="text-muted-foreground hover:text-foreground text-lg">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Nome da conta</label>
+                <input value={addLabel} onChange={e=>setAddLabel(e.target.value)}
+                  placeholder="Ex: Clínica ABC"
+                  className="w-full h-9 px-3 rounded-lg text-sm bg-secondary border border-border outline-none focus:border-cyan-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Subdomínio Kommo</label>
+                <input value={addSubdomain} onChange={e=>setAddSubdomain(e.target.value)}
+                  placeholder="Ex: clinicaabc (sem .kommo.com)"
+                  className="w-full h-9 px-3 rounded-lg text-sm bg-secondary border border-border outline-none focus:border-cyan-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Token de acesso</label>
+                <input value={addToken} onChange={e=>setAddToken(e.target.value)} type="password"
+                  placeholder="Bearer token"
+                  className="w-full h-9 px-3 rounded-lg text-sm bg-secondary border border-border outline-none focus:border-cyan-500/50 transition-colors" />
+              </div>
+              {addError && <p className="text-xs text-rose-400">{addError}</p>}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => { setShowAddModal(false); setAddError(""); }}
+                className="flex-1 h-9 rounded-lg text-sm border border-border text-muted-foreground hover:text-foreground transition-colors">
+                Cancelar
+              </button>
+              <button onClick={saveAccount} disabled={addSaving}
+                className="flex-1 h-9 rounded-lg text-sm font-medium bg-cyan-500/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/25 transition-all disabled:opacity-50">
+                {addSaving ? "Salvando…" : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
