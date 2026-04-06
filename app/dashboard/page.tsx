@@ -248,25 +248,6 @@ function KommoView({ kd }: { kd: KommoData }) {
         </ResponsiveContainer>
       </PanelCard>
 
-      {/* Ranking */}
-      {kd.ranking.length > 0 && (
-        <PanelCard title="Ranking vendedores" icon="🏆">
-          <div className="space-y-2">
-            {kd.ranking.map((u,i)=>(
-              <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm font-bold w-6 ${i===0?"text-amber-400":i===1?"text-slate-300":i===2?"text-amber-600":"text-muted-foreground"}`}>{i+1}°</span>
-                  <span className="text-sm font-medium">{u.name}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-muted-foreground">{u.active} ativos</span>
-                  <span className="text-sm font-bold text-emerald-400">{u.won} ganhos</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </PanelCard>
-      )}
 
       {/* Faturamento histórico */}
       {kd.faturamento_historico.some(h=>h.value>0) && (
@@ -627,12 +608,12 @@ export default function Dashboard() {
                 </div>
               </PanelCard>
 
-              {/* Entradas vs Fechamentos */}
-              <PanelCard title="Entradas vs Fechamentos" icon="📈">
+              {/* Leads vs Fechamentos */}
+              <PanelCard title="Leads vs Fechamentos" icon="📈">
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={[
                     { name:"Leads que entraram", value:data.total_leads },
-                    { name:"Pacientes ativos", value:data.total_pacientes },
+                    { name:"Fechados (pacientes)", value:data.total_pacientes },
                   ]} margin={{top:5,right:10,left:-10,bottom:5}}>
                     <XAxis dataKey="name" tick={{fontSize:11}} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))" />
