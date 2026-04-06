@@ -299,6 +299,8 @@ export default function Dashboard() {
   const [metaSaved, setMetaSaved] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [showCal, setShowCal] = useState<"from"|"to"|null>(null);
+  const [calMonth, setCalMonth] = useState(() => new Date());
 
   // ── Multi-accounts ──
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -545,28 +547,106 @@ export default function Dashboard() {
           <div className="space-y-5">
 
             {/* Filtro de data */}
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
+            {/* ── Filtro de período com calendário ── */}
+            <div className="relative flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtrar período</span>
+
+              {/* Botão De */}
               <div className="flex items-center gap-2">
                 <label className="text-xs text-muted-foreground">De</label>
-                <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
-                  className="h-8 px-3 rounded-lg text-xs bg-secondary border border-border outline-none focus:border-cyan-500/50 transition-colors" />
+                <button onClick={()=>{ setShowCal(showCal==="from"?null:"from"); setCalMonth(dateFrom?new Date(dateFrom+"T12:00:00"):new Date()); }}
+                  className={`h-8 px-3 rounded-lg text-xs border transition-all ${dateFrom?"border-cyan-500/50 text-cyan-400 bg-cyan-500/10":"border-border text-muted-foreground bg-secondary"} hover:border-cyan-500/50`}>
+                  📅 {dateFrom ? new Date(dateFrom+"T12:00:00").toLocaleDateString("pt-BR") : "dd/mm/aaaa"}
+                </button>
               </div>
+
+              {/* Botão Até */}
               <div className="flex items-center gap-2">
                 <label className="text-xs text-muted-foreground">Até</label>
-                <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
-                  className="h-8 px-3 rounded-lg text-xs bg-secondary border border-border outline-none focus:border-cyan-500/50 transition-colors" />
+                <button onClick={()=>{ setShowCal(showCal==="to"?null:"to"); setCalMonth(dateTo?new Date(dateTo+"T12:00:00"):new Date()); }}
+                  className={`h-8 px-3 rounded-lg text-xs border transition-all ${dateTo?"border-cyan-500/50 text-cyan-400 bg-cyan-500/10":"border-border text-muted-foreground bg-secondary"} hover:border-cyan-500/50`}>
+                  📅 {dateTo ? new Date(dateTo+"T12:00:00").toLocaleDateString("pt-BR") : "dd/mm/aaaa"}
+                </button>
               </div>
-              <button onClick={()=>fetchData(dateFrom,dateTo)}
+
+              <button onClick={()=>{ fetchData(dateFrom,dateTo); setShowCal(null); }}
                 className="h-8 px-4 rounded-lg text-xs font-medium bg-cyan-500/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/25 transition-all">
                 Aplicar
               </button>
               {(dateFrom||dateTo) && (
-                <button onClick={()=>{ setDateFrom(""); setDateTo(""); fetchData(); }}
+                <button onClick={()=>{ setDateFrom(""); setDateTo(""); setShowCal(null); fetchData(); }}
                   className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-rose-400 border border-border hover:border-rose-500/30 transition-all">
                   Limpar
                 </button>
               )}
+
+              {/* Popup calendário */}
+              {showCal && (() => {
+                const yr = calMonth.getFullYear(), mo = calMonth.getMonth();
+                const firstDay = new Date(yr, mo, 1).getDay();
+                const daysInMonth = new Date(yr, mo+1, 0).getDate();
+                const today = new Date().toISOString().slice(0,10);
+                const cells: (number|null)[] = Array(firstDay).fill(null);
+                for(let d=1;d<=daysInMonth;d++) cells.push(d);
+                while(cells.length%7!==0) cells.push(null);
+
+                const selectDay = (day: number) => {
+                  const iso = `${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+                  if(showCal==="from"){ setDateFrom(iso); setShowCal(null); }
+                  else { setDateTo(iso); setShowCal(null); }
+                };
+
+                const dayStr = (day:number) => `${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+
+                return (
+                  <div className="absolute top-full left-0 z-50 mt-2 w-72 rounded-2xl border border-border bg-card shadow-2xl p-4"
+                    style={{top:"100%"}}>
+                    {/* Header mês/ano */}
+                    <div className="flex items-center justify-between mb-3">
+                      <button onClick={()=>setCalMonth(new Date(yr,mo-1,1))}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition">‹</button>
+                      <span className="text-sm font-semibold capitalize">
+                        {calMonth.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}
+                      </span>
+                      <button onClick={()=>setCalMonth(new Date(yr,mo+1,1))}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition">›</button>
+                    </div>
+
+                    {/* Dias da semana */}
+                    <div className="grid grid-cols-7 mb-1">
+                      {["D","S","T","Q","Q","S","S"].map((d,i)=>(
+                        <div key={i} className="text-center text-[10px] font-semibold text-muted-foreground py-1">{d}</div>
+                      ))}
+                    </div>
+
+                    {/* Células */}
+                    <div className="grid grid-cols-7 gap-0.5">
+                      {cells.map((day,i) => {
+                        if(!day) return <div key={i} />;
+                        const iso = dayStr(day);
+                        const isFrom = iso === dateFrom;
+                        const isTo = iso === dateTo;
+                        const inRange = dateFrom && dateTo && iso > dateFrom && iso < dateTo;
+                        const isToday = iso === today;
+                        return (
+                          <button key={i} onClick={()=>selectDay(day)}
+                            className={`w-full aspect-square rounded-lg text-xs font-medium transition-all
+                              ${isFrom||isTo ? "bg-cyan-500 text-white" :
+                                inRange ? "bg-cyan-500/20 text-cyan-400" :
+                                isToday ? "bg-secondary text-cyan-400 font-bold" :
+                                "text-foreground hover:bg-secondary"}`}>
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="text-[10px] text-muted-foreground text-center mt-3">
+                      Selecionando: <span className="text-cyan-400 font-medium">{showCal==="from"?"data inicial":"data final"}</span>
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Row 1 — Leads por período */}
