@@ -106,34 +106,31 @@ export async function GET(req: NextRequest) {
         : sb.from("follow_up_tracking").select("status, follow_up_count"),
       sb.from("dados_cliente").select("telefone").eq("humano", true),
       sb.from("bug_ia").select("id, created_at, stage, resolved").order("created_at", { ascending: false }),
-      sb.from("nsf_messages").select("phone, role, created_at").gte("created_at", startOfDay(30)).order("phone").order("created_at", { ascending: true }),
+      sb.from("nsf_messages").select("phone, role, stage, created_at").gte("created_at", startOfDay(30)).order("phone").order("created_at", { ascending: true }),
     ]);
 
-    // Tempo médio de resposta da IA (mensagem cliente → próxima msg "ai")
+    // Tempo médio da IA: primeira msg do lead (stage 1) → última msg "ai" no stage 6
     let tempoMedioResposta = 0;
     if (messagesData && messagesData.length > 0) {
       const diffs: number[] = [];
       // Agrupar por phone
-      const byPhone: Record<string, { role: string; created_at: string }[]> = {};
+      const byPhone: Record<string, { role: string; stage: number; created_at: string }[]> = {};
       (messagesData as any[]).forEach((m) => {
         if (!byPhone[m.phone]) byPhone[m.phone] = [];
-        byPhone[m.phone].push({ role: m.role, created_at: m.created_at });
+        byPhone[m.phone].push({ role: m.role, stage: Number(m.stage) || 1, created_at: m.created_at });
       });
       Object.values(byPhone).forEach((msgs) => {
-        for (let i = 0; i < msgs.length - 1; i++) {
-          const cur = msgs[i];
-          const next = msgs[i + 1];
-          // Mensagem do cliente (não é ai nem human) seguida de resposta ai
-          if (cur.role !== "ai" && cur.role !== "human" && next.role === "ai") {
-            const diffMs = new Date(next.created_at).getTime() - new Date(cur.created_at).getTime();
-            // Ignora outliers (> 10 min ou negativo)
-            if (diffMs > 0 && diffMs < 600_000) diffs.push(diffMs);
-          }
-        }
+        // Só calcula para leads que chegaram ao stage 6
+        const lastStage6Ai = [...msgs].reverse().find(m => m.role === "ai" && m.stage === 6);
+        if (!lastStage6Ai) return;
+        const firstMsg = msgs[0];
+        const diffMs = new Date(lastStage6Ai.created_at).getTime() - new Date(firstMsg.created_at).getTime();
+        // Ignora negativos ou conversas > 4h (outliers)
+        if (diffMs > 0 && diffMs < 14_400_000) diffs.push(diffMs);
       });
       if (diffs.length > 0) {
         const avgMs = diffs.reduce((a, b) => a + b, 0) / diffs.length;
-        tempoMedioResposta = Math.round(avgMs / 1000); // em segundos
+        tempoMedioResposta = Math.round(avgMs / 60_000); // em minutos
       }
     }
 
