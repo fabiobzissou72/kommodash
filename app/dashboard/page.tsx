@@ -603,7 +603,7 @@ export default function Dashboard() {
               </div>
 
               <StatCard label="Tempo médio de resposta"
-                value={data.tempo_medio_resposta > 0 ? `${data.tempo_medio_resposta}min` : "--"}
+                value={data.tempo_medio_resposta > 0 ? (data.tempo_medio_resposta < 60 ? `${data.tempo_medio_resposta}s` : `${Math.round(data.tempo_medio_resposta/60)}min`) : "--"}
                 accent="purple" icon="⏱️" sub="tempo médio bot responder" />
             </div>
 
