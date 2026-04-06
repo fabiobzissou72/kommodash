@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
       { data: convStages },
       { data: fupTracking },
       { data: humanosData },
+      { data: bugsData },
     ] = await Promise.all([
       sb.from("dados_cliente").select("*", { count: "exact", head: true }),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", todayStr),
@@ -103,6 +104,7 @@ export async function GET(req: NextRequest) {
         ? sb.from("follow_up_tracking").select("status, follow_up_count").gte("created_at", periodStart).lte("created_at", periodEnd)
         : sb.from("follow_up_tracking").select("status, follow_up_count"),
       sb.from("dados_cliente").select("telefone").eq("humano", true),
+      sb.from("bug_ia").select("id, created_at, stage, resolved").order("created_at", { ascending: false }),
     ]);
 
     // Stage distribution
@@ -268,6 +270,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       // Funil
       tempo_medio_resposta: 0, // TODO: calcular de n8n_chat_histories
+      // Bug IA
+      bug_total: (bugsData||[]).length,
+      bug_abertos: (bugsData||[]).filter((b:any)=>!b.resolved).length,
+      bug_resolvidos: (bugsData||[]).filter((b:any)=>b.resolved).length,
+      bug_por_dia: (() => {
+        const map: Record<string,{abertos:number;resolvidos:number}> = {};
+        for (let i=6;i>=0;i--) {
+          const d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
+          const k = d.toISOString().slice(0,10);
+          map[k] = {abertos:0,resolvidos:0};
+        }
+        (bugsData||[]).forEach((b:any)=>{
+          const k = (b.created_at||"").slice(0,10);
+          if (map[k]) { if(b.resolved) map[k].resolvidos++; else map[k].abertos++; }
+        });
+        return Object.entries(map).map(([date,v])=>({ date: date.slice(5), ...v }));
+      })(),
       leads_hoje: leadsHoje ?? 0,
       leads_semana: leadsSemana ?? 0,
       leads_mes: leadsMes ?? 0,

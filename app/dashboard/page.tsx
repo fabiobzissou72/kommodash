@@ -21,6 +21,10 @@ type SilvestreData = {
   funil_etapas: { name: string; count: number }[];
   leads_por_dia: { date: string; count: number }[];
   tempo_medio_resposta: number;
+  bug_total: number;
+  bug_abertos: number;
+  bug_resolvidos: number;
+  bug_por_dia: { date: string; abertos: number; resolvidos: number }[];
   // IA
   ia_taxa_conclusao: number;
   ia_handoff_humano: number;
@@ -307,6 +311,13 @@ export default function Dashboard() {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
 
+  // ── Bug IA ──
+  const [showBugModal, setShowBugModal] = useState(false);
+  const [bugPhone, setBugPhone] = useState("");
+  const [bugStage, setBugStage] = useState("");
+  const [bugDesc, setBugDesc] = useState("");
+  const [bugSaving, setBugSaving] = useState(false);
+
   useEffect(() => {
     const saved = localStorage.getItem("dash_meta_mensal");
     if (saved && Number(saved) > 0) { setMeta(Number(saved)); setMetaInput(saved); }
@@ -398,6 +409,19 @@ export default function Dashboard() {
     });
     if (selectedAccount?.subdomain === subdomain) { setSelectedAccount(null); setKommoData(null); }
     await fetchAccounts();
+  }
+
+  async function saveBug() {
+    setBugSaving(true);
+    try {
+      await fetch("/api/bug-ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: bugPhone, stage: Number(bugStage)||null, descricao: bugDesc }),
+      });
+      setShowBugModal(false); setBugPhone(""); setBugStage(""); setBugDesc("");
+      fetchData(dateFrom, dateTo);
+    } finally { setBugSaving(false); }
   }
 
   async function logout() { await fetch("/api/auth", { method:"DELETE" }); router.push("/"); }
@@ -662,16 +686,27 @@ export default function Dashboard() {
         {tab === "ia_qual" && data && (
           <div className="space-y-5">
 
+            {/* Cards IA */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="Conclusão da IA" value={`${data.ia_taxa_conclusao}%`}
                 accent={data.ia_taxa_conclusao>=60?"green":data.ia_taxa_conclusao>=30?"yellow":"red"}
-                icon="🤖" sub="leads que completaram a IA" />
+                icon="🤖" sub="completaram todas as etapas" />
               <StatCard label="Handoff a humano" value={`${data.ia_handoff_humano}%`}
-                accent="cyan" icon="🤝" sub="chegaram ao atendimento humano" />
-              <StatCard label="Total conversas" value={data.total_conversas}
-                accent="purple" icon="💬" sub="no Supabase" />
-              <StatCard label="Em humano agora" value={data.funil_etapas.find(e=>e.name==="Humano")?.count??0}
-                accent="orange" icon="👤" sub="leads com atendente" />
+                accent="cyan" icon="🤝" sub="leads que chegaram ao humano" />
+              <StatCard label="Tempo IA→Humano" value={data.tempo_medio_resposta>0?`${data.tempo_medio_resposta}min`:"--"}
+                accent="purple" icon="⏱️" sub="tempo médio de transição" />
+              <div className="relative overflow-hidden rounded-xl border border-border bg-rose-500/8 p-5">
+                <div className="absolute inset-x-0 top-0 h-0.5 bg-rose-400 opacity-60" />
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Bug IA</p>
+                  <button onClick={()=>setShowBugModal(true)}
+                    className="h-6 px-2 rounded text-xs bg-rose-500/15 text-rose-400 border border-rose-500/25 hover:bg-rose-500/25 transition-all">
+                    + Registrar
+                  </button>
+                </div>
+                <p className="text-3xl font-bold text-rose-400">{data.bug_abertos}</p>
+                <p className="text-xs text-muted-foreground mt-2">{data.bug_resolvidos} resolvidos · {data.bug_total} total</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -728,6 +763,30 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
+            </PanelCard>
+
+            {/* Bug IA — evolução 7 dias */}
+            <PanelCard title="Bug IA — últimos 7 dias" icon="🐛">
+              {data.bug_total === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground text-sm">Nenhum bug registrado ainda</p>
+                  <button onClick={()=>setShowBugModal(true)}
+                    className="mt-3 h-8 px-4 rounded-lg text-xs font-medium bg-rose-500/15 text-rose-400 border border-rose-500/25 hover:bg-rose-500/25 transition-all">
+                    + Registrar primeiro bug
+                  </button>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={data.bug_por_dia} margin={{top:5,right:10,left:-10,bottom:5}}>
+                    <XAxis dataKey="date" tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{fontSize:10}} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
+                    <Legend wrapperStyle={{fontSize:11}} />
+                    <Bar dataKey="abertos" name="Abertos" fill="#f43f5e" radius={[4,4,0,0]} />
+                    <Bar dataKey="resolvidos" name="Resolvidos" fill="#00e5a0" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </PanelCard>
 
           </div>
@@ -1036,6 +1095,54 @@ export default function Dashboard() {
         )} {/* end !selectedAccount */}
 
       </div>
+
+      {/* ── Bug IA Modal ── */}
+      {showBugModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base">Registrar Bug IA</h3>
+              <button onClick={()=>setShowBugModal(false)} className="text-muted-foreground hover:text-foreground text-lg">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Telefone do lead (opcional)</label>
+                <input value={bugPhone} onChange={e=>setBugPhone(e.target.value)} placeholder="55119..."
+                  className="w-full h-9 px-3 rounded-lg text-sm bg-secondary border border-border outline-none focus:border-rose-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Etapa onde travou</label>
+                <select value={bugStage} onChange={e=>setBugStage(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg text-sm bg-secondary border border-border outline-none focus:border-rose-500/50 transition-colors">
+                  <option value="">Selecione...</option>
+                  <option value="1">Etapa 1 — Contato Inicial</option>
+                  <option value="2">Etapa 2 — Motivação</option>
+                  <option value="3">Etapa 3 — Emocional</option>
+                  <option value="4">Etapa 4</option>
+                  <option value="5">Etapa 5</option>
+                  <option value="6">IA Concluiu</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Descrição do bug</label>
+                <textarea value={bugDesc} onChange={e=>setBugDesc(e.target.value)} rows={3}
+                  placeholder="O que aconteceu?"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-secondary border border-border outline-none focus:border-rose-500/50 transition-colors resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={()=>setShowBugModal(false)}
+                className="flex-1 h-9 rounded-lg text-sm border border-border text-muted-foreground hover:text-foreground transition-colors">
+                Cancelar
+              </button>
+              <button onClick={saveBug} disabled={bugSaving}
+                className="flex-1 h-9 rounded-lg text-sm font-medium bg-rose-500/15 text-rose-400 border border-rose-500/25 hover:bg-rose-500/25 transition-all disabled:opacity-50">
+                {bugSaving ? "Salvando…" : "Registrar Bug"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Add Account Modal ── */}
       {showAddModal && (
