@@ -546,10 +546,38 @@ export default function Dashboard() {
         {tab === "funil" && data && (
           <div className="space-y-5">
 
-            {/* Filtro de data */}
             {/* ── Filtro de período com calendário ── */}
             <div className="relative flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtrar período</span>
+
+              {/* Atalhos rápidos */}
+              {[
+                { label:"Hoje", fn:()=>{ const d=new Date().toISOString().slice(0,10); setDateFrom(d); setDateTo(d); setShowCal(null); fetchData(d,d); }},
+                { label:"Ontem", fn:()=>{ const d=new Date(); d.setDate(d.getDate()-1); const s=d.toISOString().slice(0,10); setDateFrom(s); setDateTo(s); setShowCal(null); fetchData(s,s); }},
+                { label:"Esta semana", fn:()=>{
+                  const now=new Date(); const dow=now.getDay()||7;
+                  const mon=new Date(now); mon.setDate(now.getDate()-(dow-1));
+                  const f=mon.toISOString().slice(0,10); const t=now.toISOString().slice(0,10);
+                  setDateFrom(f); setDateTo(t); setShowCal(null); fetchData(f,t);
+                }},
+                { label:"Este mês", fn:()=>{
+                  const now=new Date();
+                  const f=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-01`;
+                  const t=now.toISOString().slice(0,10);
+                  setDateFrom(f); setDateTo(t); setShowCal(null); fetchData(f,t);
+                }},
+                { label:"Mês passado", fn:()=>{
+                  const now=new Date(); const y=now.getMonth()===0?now.getFullYear()-1:now.getFullYear(); const m=now.getMonth()===0?12:now.getMonth();
+                  const f=`${y}-${String(m).padStart(2,"0")}-01`;
+                  const last=new Date(y,m,0); const t=last.toISOString().slice(0,10);
+                  setDateFrom(f); setDateTo(t); setShowCal(null); fetchData(f,t);
+                }},
+              ].map(({label,fn})=>(
+                <button key={label} onClick={fn}
+                  className="h-7 px-3 rounded-lg text-xs border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-all">
+                  {label}
+                </button>
+              ))}
 
               {/* Botão De */}
               <div className="flex items-center gap-2">
