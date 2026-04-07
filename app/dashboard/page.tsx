@@ -322,6 +322,9 @@ export default function Dashboard() {
   const [showCal, setShowCal] = useState<"from"|"to"|null>(null);
   const [calMonth, setCalMonth] = useState(() => new Date());
 
+  // ── User role ──
+  const [userRole, setUserRole] = useState<"admin"|"viewer">("viewer");
+
   // ── Multi-accounts ──
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -433,6 +436,10 @@ export default function Dashboard() {
     await fetchFeriados();
   }
 
+  useEffect(() => {
+    fetch("/api/me").then(r => r.json()).then(j => { if (j.role) setUserRole(j.role); });
+  }, []);
+
   useEffect(() => { fetchData(); fetchAccounts(); fetchFeriados(); }, [fetchData, fetchAccounts, fetchFeriados]);
   useEffect(() => { if (selectedAccount) fetchKommoData(selectedAccount); }, [selectedAccount, fetchKommoData]);
   useEffect(() => {
@@ -504,25 +511,27 @@ export default function Dashboard() {
               <span className="text-[10px] text-muted-foreground leading-none mt-0.5">Dashboard</span>
             </div>
           </div>
-          {/* Account selector */}
-          <div className="flex items-center gap-2 flex-1 justify-center">
-            <button
-              onClick={() => { setSelectedAccount(null); setKommoData(null); }}
-              className={`h-8 px-3 rounded-lg text-xs font-medium border transition-all ${!selectedAccount ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}>
-              Nutri Silvestre
-            </button>
-            {accounts.map(acc => (
-              <button key={acc.id}
-                onClick={() => setSelectedAccount(acc)}
-                className={`h-8 px-3 rounded-lg text-xs font-medium border transition-all ${selectedAccount?.id === acc.id ? "bg-violet-500/15 text-violet-400 border-violet-500/25" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}>
-                {acc.label}
+          {/* Account selector — apenas admin */}
+          {userRole === "admin" && (
+            <div className="flex items-center gap-2 flex-1 justify-center">
+              <button
+                onClick={() => { setSelectedAccount(null); setKommoData(null); }}
+                className={`h-8 px-3 rounded-lg text-xs font-medium border transition-all ${!selectedAccount ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}>
+                Nutri Silvestre
               </button>
-            ))}
-            <button onClick={() => setShowAddModal(true)}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-sm bg-secondary border border-border text-muted-foreground hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
-              +
-            </button>
-          </div>
+              {accounts.map(acc => (
+                <button key={acc.id}
+                  onClick={() => setSelectedAccount(acc)}
+                  className={`h-8 px-3 rounded-lg text-xs font-medium border transition-all ${selectedAccount?.id === acc.id ? "bg-violet-500/15 text-violet-400 border-violet-500/25" : "bg-secondary border-border text-muted-foreground hover:text-foreground"}`}>
+                  {acc.label}
+                </button>
+              ))}
+              <button onClick={() => setShowAddModal(true)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-sm bg-secondary border border-border text-muted-foreground hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
+                +
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             {loading && (
