@@ -228,8 +228,8 @@ export async function GET(req: NextRequest) {
     // IA metrics
     const stageOrder = [1, 2, 3, 4, 5, 6, 99];
     const stageNames: Record<number, string> = {
-      1: "Etapa 1", 2: "Etapa 2", 3: "Etapa 3",
-      4: "Etapa 4", 5: "Etapa 5", 6: "Etapa 6", 99: "Humano",
+      1: "Abertura", 2: "Diagnóstico", 3: "Espelhamento",
+      4: "Orientação", 5: "Transição", 6: "Concluído", 99: "Humano",
     };
 
     const iaAbandonoPorEtapa = stageOrder.map((stage, i) => {
