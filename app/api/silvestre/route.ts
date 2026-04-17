@@ -7,6 +7,8 @@ const RD_TOKEN = "69cacc672fdda900130b9074";
 const RD_BASE = "https://crm.rdstation.com/api/v1";
 const PIPELINE_FUP = "69cab6d0f9efe6001ae97e70";
 const PIPELINE_PACIENTES = "69cac118c640ee001964801b";
+const STAGE_LEADS_QUENTES = "69d54cdbfffb4c0013c8b27b";
+const STAGE_AG_PAGAMENTO = "69d67b0b154f0f001672972e";
 
 function getSb() {
   return createClient(process.env.N8N_SUPABASE_URL!, process.env.N8N_SUPABASE_KEY!);
@@ -19,6 +21,20 @@ async function rdFetch(path: string): Promise<any> {
     if (!res.ok) return null;
     return res.json();
   } catch { return null; }
+}
+
+async function getRdDealsByStage(stageId: string): Promise<any[]> {
+  const deals: any[] = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore && page <= 10) {
+    const d = await rdFetch(`/deals?deal_stage_id=${stageId}&limit=200&page=${page}`);
+    if (!d || !Array.isArray(d.deals)) break;
+    deals.push(...d.deals);
+    hasMore = d.has_more || false;
+    page++;
+  }
+  return deals;
 }
 
 async function getAllRdDeals(pipelineId: string): Promise<any[]> {
@@ -140,7 +156,7 @@ export async function GET(req: NextRequest) {
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", weekStr),
       sb.from("dados_cliente").select("*", { count: "exact", head: true }).gte("created_at", periodStart).lte("created_at", periodEnd),
       sb.from("dados_cliente").select("created_at").gte("created_at", chartStart).lte("created_at", periodEnd),
-      sb.from("nsf_conversations").select("phone, current_stage, created_at"),
+      sb.from("nsf_conversations").select("phone, current_stage, created_at, updated_at"),
       hasFilter
         ? sb.from("follow_up_tracking").select("status, follow_up_count").gte("created_at", periodStart).lte("created_at", periodEnd)
         : sb.from("follow_up_tracking").select("status, follow_up_count"),
@@ -183,6 +199,14 @@ export async function GET(req: NextRequest) {
       stageMap[s] = (stageMap[s] || 0) + 1;
     });
 
+    // Respondidos hoje (ou no período filtrado)
+    const respondidoHoje = (convStages || []).filter((c: any) => {
+      if (Number(c.current_stage) !== 102) return false;
+      const upd = c.updated_at || c.created_at || "";
+      if (hasFilter) return upd >= periodStart && upd <= periodEnd;
+      return upd >= todayStr;
+    }).length;
+
     const totalConvs = convStages?.length || 0;
 
     // Mapa de stage por telefone (para cruzar com humano=true)
@@ -198,16 +222,6 @@ export async function GET(req: NextRequest) {
       return s === undefined || (s !== 100 && s !== 101 && s !== 102);
     }).length;
 
-    // Funil de atendimento
-    const funnelEtapas = [
-      { name: "Contato Inicial", count: stageMap[1] || 0 },
-      { name: "IA Respondeu", count: (stageMap[2]||0)+(stageMap[3]||0)+(stageMap[4]||0)+(stageMap[5]||0) },
-      { name: "IA Concluiu", count: stageMap[6] || 0 },
-      { name: "Humano", count: countHumanoReal },
-      { name: "Lead Quente", count: stageMap[100] || 0 },
-      { name: "Ag. Pagamento", count: stageMap[101] || 0 },
-      { name: "Respondido", count: stageMap[102] || 0 },
-    ];
 
     // Leads por dia - últimos 30d
     const dayCount: Record<string, number> = {};
@@ -228,8 +242,8 @@ export async function GET(req: NextRequest) {
     // IA metrics
     const stageOrder = [1, 2, 3, 4, 5, 6, 99];
     const stageNames: Record<number, string> = {
-      1: "Abertura", 2: "Diagnóstico", 3: "Espelhamento",
-      4: "Orientação", 5: "Transição", 6: "Concluído", 99: "Humano",
+      1: "Apresentação", 2: "Diagnóstico", 3: "Espelhamento",
+      4: "Planos e Valores", 5: "Fechamento", 6: "Concluído", 99: "Humano",
     };
 
     const iaAbandonoPorEtapa = stageOrder.map((stage, i) => {
@@ -246,10 +260,23 @@ export async function GET(req: NextRequest) {
     const iaHandoffHumano = totalConvs > 0 ? Math.round((reachedHumano/totalConvs)*100) : 0;
 
     // RD Station em paralelo
-    const [fupDeals, pacientesDeals] = await Promise.all([
+    const [fupDeals, pacientesDeals, leadsQuentesDeals, agPagamentoDeals] = await Promise.all([
       getAllRdDeals(PIPELINE_FUP),
       getAllRdDeals(PIPELINE_PACIENTES),
+      getRdDealsByStage(STAGE_LEADS_QUENTES),
+      getRdDealsByStage(STAGE_AG_PAGAMENTO),
     ]);
+
+    // Funil de atendimento
+    const funnelEtapas = [
+      { name: "Contato Inicial", count: stageMap[1] || 0 },
+      { name: "IA Respondeu", count: stageMap[1] || 0 },
+      { name: "IA Concluiu", count: stageMap[6] || 0 },
+      { name: "Humano", count: stageMap[6] || 0 },
+      { name: "Lead Quente", count: leadsQuentesDeals.length },
+      { name: "Ag. Pagamento", count: agPagamentoDeals.length },
+      { name: "Respondido", count: respondidoHoje },
+    ];
 
     // FUP stats da tabela follow_up_tracking
     const fupTrackingAll = fupTracking || [];
@@ -462,6 +489,10 @@ export async function GET(req: NextRequest) {
         { plano: "Semestral", count: finSemestralCount, valor: finSemestralValor },
       ],
       total_pacientes: totalPacientes,
+      leads_quentes: leadsQuentesDeals.length,
+      ag_pagamento: agPagamentoDeals.length,
+      respondido_hoje: respondidoHoje,
+      respondido_total: stageMap[102] || 0,
     });
 
   } catch (e: any) {

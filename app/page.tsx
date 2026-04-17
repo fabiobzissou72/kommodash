@@ -2,16 +2,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+type Mode = "login" | "register" | "change";
+
 export default function Login() {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<Mode>("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [newPass, setNewPass] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError("");
+    setSuccess("");
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -41,10 +50,29 @@ export default function Login() {
     const json = await res.json();
     if (res.ok) {
       setSuccess("Conta criada! Agora faça login.");
-      setMode("login");
+      switchMode("login");
       setName(""); setPass(""); setInviteCode("");
     } else {
       setError(json.error || "Erro ao cadastrar");
+    }
+    setLoading(false);
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true); setError(""); setSuccess("");
+    const res = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, invite_code: inviteCode, new_pass: newPass }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setSuccess("Senha alterada com sucesso! Faça login com a nova senha.");
+      switchMode("login");
+      setNewPass(""); setInviteCode("");
+    } else {
+      setError(json.error || "Erro ao alterar senha");
     }
     setLoading(false);
   }
@@ -60,27 +88,35 @@ export default function Login() {
           </div>
           <h1 className="text-2xl font-bold text-white">Kommo Dashboard</h1>
           <p className="text-gray-400 text-sm mt-1">
-            {mode === "login" ? "Acesse sua conta" : "Criar nova conta"}
+            {mode === "login" ? "Acesse sua conta" : mode === "register" ? "Criar nova conta" : "Trocar senha"}
           </p>
         </div>
 
         {/* Tabs */}
         <div className="flex bg-gray-800 rounded-lg p-1 mb-6">
           <button
-            onClick={() => { setMode("login"); setError(""); setSuccess(""); }}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition ${mode === "login" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`}
+            onClick={() => switchMode("login")}
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition ${mode === "login" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`}
           >
             Entrar
           </button>
           <button
-            onClick={() => { setMode("register"); setError(""); setSuccess(""); }}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition ${mode === "register" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`}
+            onClick={() => switchMode("register")}
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition ${mode === "register" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`}
           >
             Cadastrar
           </button>
+          <button
+            onClick={() => switchMode("change")}
+            className={`flex-1 py-2 text-xs font-medium rounded-md transition ${mode === "change" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`}
+          >
+            Trocar Senha
+          </button>
         </div>
 
-        {mode === "login" ? (
+        {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
+
+        {mode === "login" && (
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="email"
@@ -98,7 +134,6 @@ export default function Login() {
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
               required
             />
-            {success && <p className="text-green-400 text-sm">{success}</p>}
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button
               type="submit"
@@ -108,7 +143,9 @@ export default function Login() {
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
-        ) : (
+        )}
+
+        {mode === "register" && (
           <form onSubmit={handleRegister} className="space-y-4">
             <input
               type="text"
@@ -128,12 +165,12 @@ export default function Login() {
             />
             <input
               type="password"
-              placeholder="Senha (mínimo 6 caracteres)"
+              placeholder="Senha (8+ chars, maiúscula e número)"
               value={pass}
               onChange={e => setPass(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
               required
-              minLength={6}
+              minLength={8}
             />
             <input
               type="text"
@@ -150,6 +187,44 @@ export default function Login() {
               className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
             >
               {loading ? "Criando conta..." : "Criar conta"}
+            </button>
+          </form>
+        )}
+
+        {mode === "change" && (
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Código de convite"
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              required
+            />
+            <input
+              type="password"
+              placeholder="Nova senha (8+ chars, maiúscula e número)"
+              value={newPass}
+              onChange={e => setNewPass(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              required
+              minLength={8}
+            />
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
+            >
+              {loading ? "Alterando..." : "Alterar Senha"}
             </button>
           </form>
         )}

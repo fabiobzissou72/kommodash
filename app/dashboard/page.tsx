@@ -57,6 +57,10 @@ type SilvestreData = {
   fin_dias_uteis_restantes: number;
   fin_mix_planos: { plano: string; count: number; valor: number }[];
   total_pacientes: number;
+  leads_quentes: number;
+  ag_pagamento: number;
+  respondido_hoje: number;
+  respondido_total: number;
 };
 
 // ─── Account / Kommo types ───────────────────────────────────
@@ -768,6 +772,7 @@ export default function Dashboard() {
             {/* Row 2 — KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <StatCard label="Vendas hoje" value={data.vendas_hoje} accent="green" icon="💰" sub="pacientes ativos hoje" />
+              <StatCard label="Respondido hoje" value={data.respondido_hoje} accent="green" icon="✅" sub={`total acumulado: ${data.respondido_total}`} />
 
               {/* Taxa de conversão */}
               <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5">
