@@ -7,8 +7,8 @@ const RD_TOKEN = "69cacc672fdda900130b9074";
 const RD_BASE = "https://crm.rdstation.com/api/v1";
 const PIPELINE_FUP = "69cab6d0f9efe6001ae97e70";
 const PIPELINE_PACIENTES = "69cac118c640ee001964801b";
-const STAGE_LEADS_QUENTES = "69d54cdbfffb4c0013c8b27b";
-const STAGE_AG_PAGAMENTO = "69d67b0b154f0f001672972e";
+const STAGE_LEADS_QUENTES = "69d54cdbfffb4c0013c8b27a";
+const STAGE_AG_PAGAMENTO = "69d54cdbfffb4c0013c8b27b";
 
 function getSb() {
   return createClient(process.env.N8N_SUPABASE_URL!, process.env.N8N_SUPABASE_KEY!);
