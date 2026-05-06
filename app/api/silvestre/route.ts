@@ -298,55 +298,65 @@ export async function GET(req: NextRequest) {
     });
     const fupStats = Object.entries(fupStatsMap).map(([fup,stats]) => ({ fup, ...stats }));
 
-    // Financeiro (RD Station pacientes ativos) — filtra por período se set
+    // Financeiro (RD Station pacientes ativos) — filtra por data de FECHAMENTO
+    const dealDate = (d: any): string => (d.closed_at || d.created_at || "").slice(0, 10);
+
     const pacientesFiltered = hasFilter
       ? pacientesDeals.filter((d:any) => {
-          if (!d.created_at) return false;
-          const dc = d.created_at.slice(0, 10);
+          const dc = dealDate(d);
+          if (!dc) return false;
           return (!dateFrom || dc >= dateFrom) && (!dateTo || dc <= dateTo);
         })
       : pacientesDeals;
 
     const fupDealsFiltered = hasFilter
       ? fupDeals.filter((d:any) => {
-          if (!d.created_at) return false;
-          const dc = d.created_at.slice(0, 10);
+          const dc = dealDate(d);
+          if (!dc) return false;
           return (!dateFrom || dc >= dateFrom) && (!dateTo || dc <= dateTo);
         })
       : fupDeals;
 
     let finFaturamentoTotal = 0;
-    let finTrimestralCount = 0, finSemestralCount = 0;
-    let finTrimestralValor = 0, finSemestralValor = 0;
+    let finTrimestralCount = 0, finSemestralCount = 0, finAnualCount = 0;
+    let finTrimestralValor = 0, finSemestralValor = 0, finAnualValor = 0;
     const finFatHistMap: Record<string,number> = {};
 
     pacientesFiltered.forEach((d:any) => {
       const valor = d.amount_total || 0;
       finFaturamentoTotal += valor;
 
-      // Determina plano pelo valor ou campo customizado
+      // Determina plano pelo nome do deal ou campo customizado
       const fields = d.deal_custom_fields || [];
       const planField = fields.find((f:any)=>
         f.custom_field?.label?.toLowerCase().includes("plano") ||
         (f.value||"").toLowerCase().includes("trimestral") ||
-        (f.value||"").toLowerCase().includes("semestral")
+        (f.value||"").toLowerCase().includes("semestral") ||
+        (f.value||"").toLowerCase().includes("anual") ||
+        (f.value||"").toLowerCase().includes("protocolo")
       );
-      const planName = (planField?.value||"").toLowerCase();
-      const isTrimestral = planName.includes("trimestral") || (valor > 0 && valor <= 600);
-      if (isTrimestral) { finTrimestralCount++; finTrimestralValor += valor; }
+      const allText = ((planField?.value||"") + " " + (d.name||"")).toLowerCase();
+
+      const isAnual = allText.includes("anual") || allText.includes("protocolo") || valor >= 1400;
+      const isTrimestral = !isAnual && (allText.includes("trimestral") || allText.includes("primeiro passo") || (valor > 0 && valor <= 600));
+
+      if (isAnual) { finAnualCount++; finAnualValor += valor; }
+      else if (isTrimestral) { finTrimestralCount++; finTrimestralValor += valor; }
       else { finSemestralCount++; finSemestralValor += valor; }
 
-      if (d.created_at) {
-        const mk = d.created_at.slice(0, 7);
+      const dc = dealDate(d);
+      if (dc) {
+        const mk = dc.slice(0, 7);
         finFatHistMap[mk] = (finFatHistMap[mk]||0) + valor;
       }
     });
 
     const totalPacientes = pacientesFiltered.length;
     const finTicketMedio = totalPacientes > 0 ? Math.round(finFaturamentoTotal/totalPacientes) : 0;
-    const finMrr = Math.round(finTrimestralValor/3 + finSemestralValor/6);
+    const finMrr = Math.round(finTrimestralValor/3 + finSemestralValor/6 + finAnualValor/12);
     const finLtvTrimestral = finTrimestralCount > 0 ? Math.round(finTrimestralValor/finTrimestralCount) : 497;
     const finLtvSemestral = finSemestralCount > 0 ? Math.round(finSemestralValor/finSemestralCount) : 847;
+    const finLtvAnual = finAnualCount > 0 ? Math.round(finAnualValor/finAnualCount) : 1487;
 
     // Histórico faturamento 6 meses
     const finFatHistorico = Array.from({length:6},(_,i)=>{
@@ -393,7 +403,7 @@ export async function GET(req: NextRequest) {
         const startStr = wkS.toISOString().slice(0,10);
         const endStr = wkE.toISOString().slice(0,10);
         const valor = pacientesDeals
-          .filter((d:any)=>{ const dstr=(d.created_at||"").slice(0,10); return dstr>=startStr&&dstr<=endStr; })
+          .filter((d:any)=>{ const dstr=dealDate(d); return dstr>=startStr&&dstr<=endStr; })
           .reduce((s:number,d:any)=>s+(d.amount_total||0),0);
         finFatSemanal.push({
           label: `Sem ${wkNum}`,
@@ -419,7 +429,7 @@ export async function GET(req: NextRequest) {
     const taxaConversao = (totalLeads||0) > 0 ? Math.round((totalPacientes/(totalLeads||1))*100) : 0;
     const vendasHoje = hasFilter
       ? pacientesFiltered.length
-      : pacientesDeals.filter((d:any)=>d.created_at>=todayStr.slice(0,10)).length;
+      : pacientesDeals.filter((d:any)=>dealDate(d)>=todayStr.slice(0,10)).length;
 
     const fupAtivos = fupDealsFiltered.filter((d:any)=>d.deal_stage?.name?.startsWith("FUP")).length;
     const fupExpirados = fupDealsFiltered.filter((d:any)=>d.deal_stage?.name==="NUTRIÇÃO").length;
@@ -471,10 +481,13 @@ export async function GET(req: NextRequest) {
       fin_ticket_medio: finTicketMedio,
       fin_ltv_trimestral: finLtvTrimestral,
       fin_ltv_semestral: finLtvSemestral,
+      fin_ltv_anual: finLtvAnual,
       fin_trimestral_count: finTrimestralCount,
       fin_semestral_count: finSemestralCount,
+      fin_anual_count: finAnualCount,
       fin_trimestral_valor: finTrimestralValor,
       fin_semestral_valor: finSemestralValor,
+      fin_anual_valor: finAnualValor,
       fin_renov_ate_30: 0,
       fin_renov_30_60: 0,
       fin_renov_60_90: 0,
@@ -487,6 +500,7 @@ export async function GET(req: NextRequest) {
       fin_mix_planos: [
         { plano: "Trimestral", count: finTrimestralCount, valor: finTrimestralValor },
         { plano: "Semestral", count: finSemestralCount, valor: finSemestralValor },
+        { plano: "Anual", count: finAnualCount, valor: finAnualValor },
       ],
       total_pacientes: totalPacientes,
       leads_quentes: leadsQuentesDeals.length,

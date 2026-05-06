@@ -42,10 +42,13 @@ type SilvestreData = {
   fin_ticket_medio: number;
   fin_ltv_trimestral: number;
   fin_ltv_semestral: number;
+  fin_ltv_anual: number;
   fin_trimestral_count: number;
   fin_semestral_count: number;
+  fin_anual_count: number;
   fin_trimestral_valor: number;
   fin_semestral_valor: number;
+  fin_anual_valor: number;
   fin_renov_ate_30: number;
   fin_renov_30_60: number;
   fin_renov_60_90: number;
@@ -1144,22 +1147,31 @@ export default function Dashboard() {
             </div>
 
             {/* Row 2 — planos e LTV */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="rounded-xl border border-border bg-cyan-400/8 p-5">
                 <div className="absolute inset-x-0 top-0 h-0.5 bg-cyan-400 opacity-60 rounded-t-xl" />
                 <span className="text-xl mb-2 block">🗓</span>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Plano Trimestral</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Primeiro Passo (Trimestral)</p>
                 <p className="text-2xl font-bold text-cyan-400">{data.fin_trimestral_count}</p>
                 <p className="text-xs text-muted-foreground mt-1">{BRL(data.fin_trimestral_valor)}</p>
               </div>
               <div className="rounded-xl border border-border bg-violet-400/8 p-5">
                 <span className="text-xl mb-2 block">📆</span>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Plano Semestral</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Jornada de Constância (Semestral)</p>
                 <p className="text-2xl font-bold text-violet-400">{data.fin_semestral_count}</p>
                 <p className="text-xs text-muted-foreground mt-1">{BRL(data.fin_semestral_valor)}</p>
               </div>
-              <StatCard label="LTV Trimestral" value={BRL(data.fin_ltv_trimestral)} accent="yellow" icon="💎" sub="valor médio do plano" />
-              <StatCard label="LTV Semestral" value={BRL(data.fin_ltv_semestral)} accent="green" icon="💎" sub="valor médio do plano" />
+              <div className="rounded-xl border border-border bg-emerald-400/8 p-5">
+                <span className="text-xl mb-2 block">🏆</span>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Protocolo Completo (Anual)</p>
+                <p className="text-2xl font-bold text-emerald-400">{data.fin_anual_count ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">{BRL(data.fin_anual_valor ?? 0)}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <StatCard label="LTV Trimestral" value={BRL(data.fin_ltv_trimestral)} accent="yellow" icon="💎" sub="Primeiro Passo" />
+              <StatCard label="LTV Semestral" value={BRL(data.fin_ltv_semestral)} accent="green" icon="💎" sub="Jornada de Constância" />
+              <StatCard label="LTV Anual" value={BRL(data.fin_ltv_anual ?? 1487)} accent="cyan" icon="💎" sub="Protocolo Completo" />
             </div>
 
             {/* Meta mensal */}
