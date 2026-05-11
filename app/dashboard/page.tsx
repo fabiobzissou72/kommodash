@@ -67,7 +67,7 @@ type SilvestreData = {
 };
 
 // ─── Account / Kommo types ───────────────────────────────────
-type Account = { id: string; label: string; subdomain: string; token: string };
+type Account = { id: string; label: string; subdomain: string; token: string; pipeline_id?: number | null };
 
 type KommoData = {
   pipeline: { id: number | null; name: string };
@@ -403,7 +403,7 @@ export default function Dashboard() {
       const res = await fetch("/api/kommo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subdomain: acc.subdomain, token: acc.token }),
+        body: JSON.stringify({ subdomain: acc.subdomain, token: acc.token, pipeline_id: acc.pipeline_id ?? null }),
       });
       if (res.status === 401) { router.push("/"); return; }
       const json = await res.json();

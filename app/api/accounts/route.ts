@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("accounts")
-    .select("id, label, subdomain, token")
+    .select("id, label, subdomain, token, pipeline_id")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: "Erro ao buscar contas" }, { status: 500 });
@@ -39,12 +39,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { label?: string; subdomain?: string; token?: string };
+  let body: { label?: string; subdomain?: string; token?: string; pipeline_id?: unknown };
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Requisição inválida" }, { status: 400 });
   }
 
-  const { label, subdomain, token } = body;
+  const { label, subdomain, token, pipeline_id: rawPid } = body;
   if (!label || !subdomain || !token) {
     return NextResponse.json({ error: "Campos obrigatórios" }, { status: 400 });
   }
@@ -56,12 +56,13 @@ export async function POST(req: NextRequest) {
 
   const sanitizedLabel = String(label).trim().slice(0, 100);
   const sanitizedToken = String(token).trim().slice(0, 2048);
+  const pipelineId = rawPid != null && Number.isFinite(Number(rawPid)) ? Math.floor(Number(rawPid)) : null;
 
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("accounts")
-    .upsert({ label: sanitizedLabel, subdomain: clean, token: sanitizedToken }, { onConflict: "subdomain" })
-    .select("id, label, subdomain, token")
+    .upsert({ label: sanitizedLabel, subdomain: clean, token: sanitizedToken, pipeline_id: pipelineId }, { onConflict: "subdomain" })
+    .select("id, label, subdomain, token, pipeline_id")
     .single();
 
   if (error) return NextResponse.json({ error: "Erro ao salvar conta" }, { status: 500 });
