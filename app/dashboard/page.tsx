@@ -204,7 +204,7 @@ function KommoView({ kd }: { kd: KommoData }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PanelCard title="Funil por etapa" icon="📊">
           <div className="space-y-2">
-            {[...kd.funnel].sort((a,b)=>b.count-a.count).map((stage,i)=>{
+            {kd.funnel.map((stage,i)=>{
               const maxC = Math.max(...kd.funnel.map(f=>f.count),1);
               return (
                 <div key={i}>
@@ -799,7 +799,7 @@ export default function Dashboard() {
               {/* Volume por etapa */}
               <PanelCard title="Volume por etapa do funil" icon="📊">
                 <div className="space-y-2">
-                  {[...data.funil_etapas].sort((a,b)=>b.count-a.count).map((stage,i)=>{
+                  {data.funil_etapas.map((stage,i)=>{
                     const maxC = Math.max(...data.funil_etapas.map(f=>f.count),1);
                     return (
                       <div key={i}>
