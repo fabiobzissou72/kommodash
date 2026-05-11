@@ -126,12 +126,14 @@ export async function POST(req: NextRequest) {
       kommoFetch(subdomain, safeToken, "/users?limit=250").catch(() => ({})),
     ]);
 
-    const pipelines: { id: number; name: string; _embedded?: { statuses: { id: number; name: string }[] } }[] =
+    const pipelines: { id: number; name: string; _embedded?: { statuses: { id: number; name: string; sort?: number }[] } }[] =
       pipelinesRes._embedded?.pipelines || [];
     let pid = pipeline_id;
     if (!pid && pipelines.length > 0) pid = pipelines[0].id;
     const pipeline = pipelines.find(p => p.id === pid) || pipelines[0];
-    const statuses = (pipeline?._embedded?.statuses || []).filter((s: { id: number }) => s.id !== 142 && s.id !== 143);
+    const statuses = (pipeline?._embedded?.statuses || [])
+      .filter((s: { id: number }) => s.id !== 142 && s.id !== 143)
+      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
 
     const userMap: Record<number, string> = {};
     const usersList: { id: number; name: string }[] = usersRes._embedded?.users || [];
