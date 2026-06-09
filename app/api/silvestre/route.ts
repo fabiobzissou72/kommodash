@@ -330,6 +330,7 @@ export async function GET(req: NextRequest) {
       const products = d.deal_products || [];
       const productText = products.map((p:any) => (p.name||"").toLowerCase()).join(" ");
       const allText = (productText + " " + (d.name||"")).toLowerCase();
+      console.log("[DEBUG-PLAN]", d.name, "| products:", JSON.stringify(products.map((p:any)=>p.name)), "| allText:", allText.slice(0,80));
 
       const isAnual = allText.includes("anual") || allText.includes("protocolo");
       const isTrimestral = !isAnual && (allText.includes("trimestral") || allText.includes("primeiro passo") || (valor > 0 && valor <= 600));
