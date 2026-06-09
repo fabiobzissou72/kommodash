@@ -326,14 +326,12 @@ export async function GET(req: NextRequest) {
       const valor = d.amount_total || 0;
       finFaturamentoTotal += valor;
 
-      // Determina plano pelo nome do deal ou campo customizado (label ou valor)
-      const fields = d.deal_custom_fields || [];
-      const allFieldsText = fields.map((f:any) =>
-        [(f.custom_field?.label||""), (f.custom_field?.name||""), (f.value||"")].join(" ")
-      ).join(" ");
-      const allText = (allFieldsText + " " + (d.name||"")).toLowerCase();
+      // Determina plano pelo produto vinculado ao deal (deal_products[].name)
+      const products = d.deal_products || [];
+      const productText = products.map((p:any) => (p.name||"").toLowerCase()).join(" ");
+      const allText = (productText + " " + (d.name||"")).toLowerCase();
 
-      const isAnual = allText.includes("anual") || allText.includes("protocolo") || valor >= 1400;
+      const isAnual = allText.includes("anual") || allText.includes("protocolo");
       const isTrimestral = !isAnual && (allText.includes("trimestral") || allText.includes("primeiro passo") || (valor > 0 && valor <= 600));
 
       if (isAnual) { finAnualCount++; finAnualValor += valor; }
