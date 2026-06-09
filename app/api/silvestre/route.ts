@@ -328,14 +328,11 @@ export async function GET(req: NextRequest) {
 
       // Determina plano pelo nome do deal ou campo customizado
       const fields = d.deal_custom_fields || [];
-      const planField = fields.find((f:any)=>
-        f.custom_field?.label?.toLowerCase().includes("plano") ||
-        (f.value||"").toLowerCase().includes("trimestral") ||
-        (f.value||"").toLowerCase().includes("semestral") ||
-        (f.value||"").toLowerCase().includes("anual") ||
-        (f.value||"").toLowerCase().includes("protocolo")
-      );
-      const allText = ((planField?.value||"") + " " + (d.name||"")).toLowerCase();
+      // Concatena nome+label+valor de todos os campos para detectar o plano
+      const allFieldsText = fields.map((f:any) =>
+        [(f.custom_field?.label||""), (f.custom_field?.name||""), (f.value||"")].join(" ")
+      ).join(" ");
+      const allText = (allFieldsText + " " + (d.name||"")).toLowerCase();
 
       const isAnual = allText.includes("anual") || allText.includes("protocolo") || valor >= 1400;
       const isTrimestral = !isAnual && (allText.includes("trimestral") || allText.includes("primeiro passo") || (valor > 0 && valor <= 600));
