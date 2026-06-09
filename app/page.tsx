@@ -32,7 +32,7 @@ export default function Login() {
     });
     const json = await res.json();
     if (res.ok) {
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } else {
       setError(json.error || "Erro ao entrar");
       setLoading(false);
